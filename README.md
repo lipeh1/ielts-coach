@@ -27,6 +27,27 @@ OPENAI_MODEL=gpt-4o-mini
 
 目标、打卡、练习记录和错题只通过 `/api/study` 读写，由 Next.js 服务端保存在 `data/study-state.json`；浏览器不保存学习数据副本。此文件存储适用于单用户本地使用；部署到无持久磁盘或多实例环境前，需要换成共享数据库。AI API key 只应放在 `.env.local`，不要放入浏览器代码或提交到版本控制。
 
+只有成功读取合法学习记录（或确认尚无记录）后才能开始修改和保存。读取失败时页面暂停写入，可点击“重新读取”；初始载入不会自动写回。保存提示以服务端响应为准。`data/` 不纳入 Git，请单独备份学习记录。
+
+## 检查
+
+```bash
+pnpm test
+pnpm lint
+pnpm build
+pnpm exec playwright install chromium
+pnpm test:e2e
+```
+
+端到端测试使用独立端口与模拟学习接口，覆盖读取失败保护、重试恢复、保存和听力判分，不修改本地学习记录。
+
+已安装 Chrome 时，也可跳过浏览器下载，在 PowerShell 中运行：
+
+```powershell
+$env:PLAYWRIGHT_CHANNEL = "chrome"
+pnpm test:e2e
+```
+
 ## 实现范围
 
 - 每日计划会根据当前未掌握错题最多的科目优先安排复练。

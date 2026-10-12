@@ -6,7 +6,9 @@
     "dev": "next dev --port 7500",
     "build": "next build",
     "start": "next start --port 7500",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "node --test tests/study-data.test.mjs tests/study-storage.test.mjs",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "lucide-react": "^0.468.0",
@@ -15,6 +17,7 @@
     "react-dom": "19.3.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.64.0",
     "@tailwindcss/turbopack": "^4",
     "@types/node": "^20",
     "@types/react": "^19",

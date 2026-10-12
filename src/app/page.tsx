@@ -29,15 +29,11 @@ import {
   X,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { defaultData, isValidState, type Profile, type SavedData, type Skill, type StudyLog } from "@/lib/study-data";
 
-type Skill = "reading" | "listening" | "writing" | "speaking";
 type View = "today" | "practice" | "review" | "feedback" | "progress";
-type Profile = { targetBand: string; examDate: string; dailyTarget: number };
-type StudyLog = { id: string; date: string; minutes: number; skill: Skill; correct: number; total: number };
-type Mistake = { id: string; skill: Skill; question: string; reason: string; date: string; mastered: boolean };
 type FeedbackCriterion = { name: string; band: number; observation: string; evidence: string; suggestion: string };
 type FeedbackReport = { demo: boolean; overallBand: number; criteria: FeedbackCriterion[]; nextStep: string };
-type SavedData = { profile: Profile; logs: StudyLog[]; mistakes: Mistake[]; checkIns: string[] };
 
 const skills: { id: Skill; name: string; en: string; icon: typeof BookOpen; tint: string; minutes: number }[] = [
   { id: "listening", name: "听力", en: "Listening", icon: Headphones, tint: "blue", minutes: 12 },
@@ -64,15 +60,6 @@ const skillNames: Record<Skill, string> = {
 function localDateKey(date = new Date()) {
   const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
   return local.toISOString().slice(0, 10);
-}
-
-function defaultData(): SavedData {
-  return {
-    profile: { targetBand: "7.0", examDate: "", dailyTarget: 45 },
-    logs: [],
-    mistakes: [],
-    checkIns: [],
-  };
 }
 
 function formatDate(date: Date) {
@@ -158,6 +145,8 @@ export default function Home() {
   const [view, setView] = useState<View>("today");
   const [data, setData] = useState<SavedData>(defaultData);
   const [hydrated, setHydrated] = useState(false);
+  const [loadError, setLoadError] = useState(false);
+  const [loadAttempt, setLoadAttempt] = useState(0);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [activeSkill, setActiveSkill] = useState<Skill | null>(null);
   const [answer, setAnswer] = useState("");
@@ -170,6 +159,8 @@ export default function Home() {
   const [goalDraft, setGoalDraft] = useState<Profile>(defaultData().profile);
   const [notice, setNotice] = useState("");
   const saveQueue = useRef(Promise.resolve());
+  const lastQueuedData = useRef<string | null>(null);
+  const saveVersion = useRef(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -178,26 +169,33 @@ export default function Home() {
       try {
         const response = await fetch("/api/study", { cache: "no-store" });
         if (!response.ok) throw new Error("Study data could not be loaded");
-        const result = await response.json() as { state?: SavedData | null };
+        const result: unknown = await response.json();
+        if (!result || typeof result !== "object" || !("state" in result)
+          || (result.state !== null && !isValidState(result.state))) {
+          throw new Error("Study data response is invalid");
+        }
         if (cancelled) return;
-        setData(result.state
-          ? { ...defaultData(), ...result.state, profile: { ...defaultData().profile, ...result.state.profile } }
-          : defaultData());
+        const loadedData = result.state ?? defaultData();
+        lastQueuedData.current = JSON.stringify(loadedData);
+        setData(loadedData);
+        setHydrated(true);
       } catch {
         if (cancelled) return;
-        setNotice("服务端学习记录暂时无法读取，请检查服务后刷新页面。");
-      } finally {
-        if (!cancelled) setHydrated(true);
+        setLoadError(true);
       }
     }
 
     void loadStudyData();
     return () => { cancelled = true; };
-  }, []);
+  }, [loadAttempt]);
 
   useEffect(() => {
     if (!hydrated) return;
     const serialized = JSON.stringify(data);
+    if (serialized === lastQueuedData.current) return;
+    lastQueuedData.current = serialized;
+    const version = ++saveVersion.current;
+    setNotice("正在保存学习记录…");
     saveQueue.current = saveQueue.current.catch(() => undefined).then(async () => {
       const response = await fetch("/api/study", {
         method: "PUT",
@@ -208,8 +206,12 @@ export default function Home() {
         const result = await response.json().catch(() => null) as { error?: string } | null;
         throw new Error(result?.error || "学习记录同步失败。");
       }
+      if (saveVersion.current === version) setNotice("学习记录已保存到服务端。");
     }).catch((error: unknown) => {
-      setNotice(error instanceof Error ? error.message : "学习记录保存失败，请检查服务后重试。");
+      if (saveVersion.current === version) {
+        lastQueuedData.current = null;
+        setNotice(error instanceof Error ? error.message : "学习记录保存失败，请检查服务后重试。");
+      }
     });
   }, [data, hydrated]);
 
@@ -235,6 +237,7 @@ export default function Home() {
   const completion = Math.min(100, Math.round((todayMinutes / Math.max(1, data.profile.dailyTarget)) * 100));
 
   function startSkill(skill: Skill) {
+    if (!hydrated) return;
     setActiveSkill(skill);
     setAnswer("");
     setSessionResult(null);
@@ -248,14 +251,15 @@ export default function Home() {
   }
 
   function recordSession(skill: Skill, minutes: number, correct: number, total: number) {
+    if (!hydrated) return;
     const today = localDateKey();
     const log: StudyLog = { id: crypto.randomUUID(), date: today, minutes, skill, correct, total };
     setData((current) => ({ ...current, logs: [...current.logs, log], checkIns: current.checkIns.includes(today) ? current.checkIns : [...current.checkIns, today] }));
   }
 
   function submitSession() {
-    if (!activeSkill || !answer) return;
-    const correctAnswer = activeSkill === "reading" ? "False" : "Quiet desk";
+    if (!hydrated || !activeSkill || !answer || sessionResult) return;
+    const correctAnswer = activeSkill === "reading" ? "False" : "A quiet desk";
     const correct = activeSkill === "speaking" || answer === correctAnswer;
     const explanation = activeSkill === "reading"
       ? "原文说明她每周都会去市中心图书馆，而题目说她很少去，所以判断为 False。注意区分 False 与 Not Given：这里原文给出了相反信息。"
@@ -273,11 +277,13 @@ export default function Home() {
   }
 
   function markMastered(id: string) {
+    if (!hydrated) return;
     setData((current) => ({ ...current, mistakes: current.mistakes.map((item) => item.id === id ? { ...item, mastered: true } : item) }));
   }
 
   async function submitEssay(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!hydrated) return;
     setFeedbackLoading(true);
     setFeedbackError("");
     setFeedback(null);
@@ -298,9 +304,16 @@ export default function Home() {
 
   function saveGoal(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!hydrated) return;
     setData((current) => ({ ...current, profile: goalDraft }));
     setSettingsOpen(false);
-    setNotice("目标已保存。");
+    setNotice("");
+  }
+
+  function openGoalSettings() {
+    if (!hydrated) return;
+    setGoalDraft(data.profile);
+    setSettingsOpen(true);
   }
 
   function playListening() {
@@ -319,22 +332,26 @@ export default function Home() {
 
   return (
     <div className="app-shell">
-      <Sidebar view={view} onNavigate={(next) => { setView(next); if (next !== "practice") setActiveSkill(null); }} openSettings={() => { setGoalDraft(data.profile); setSettingsOpen(true); }} pendingReviews={pendingMistakes.length} />
+      <Sidebar view={view} onNavigate={(next) => { setView(next); if (next !== "practice") setActiveSkill(null); }} openSettings={openGoalSettings} pendingReviews={pendingMistakes.length} />
       <main className="main-area">
         <header className="topbar">
           <div className="breadcrumbs"><span>我的学习</span><span className="crumb-divider">/</span><strong>{title}</strong></div>
           <div className="topbar-actions">
             <span className="exam-date-chip"><CalendarDays size={15} />{data.profile.examDate ? daysToExam(data.profile.examDate) === 0 ? "今天考试" : `距考试 ${daysToExam(data.profile.examDate)} 天` : "考试日期未设置"}</span>
-            <button className="goal-chip" onClick={() => { setGoalDraft(data.profile); setSettingsOpen(true); }} aria-label="设置目标分数"><Target size={15} />目标 {data.profile.targetBand}</button>
-            <button className="top-avatar" onClick={() => { setGoalDraft(data.profile); setSettingsOpen(true); }} aria-label="打开目标设置">L</button>
+            <button className="goal-chip" onClick={openGoalSettings} aria-label="设置目标分数"><Target size={15} />目标 {data.profile.targetBand}</button>
+            <button className="top-avatar" onClick={openGoalSettings} aria-label="打开目标设置">L</button>
           </div>
         </header>
         <div className="page-content">
+          {!hydrated && <div className="notice" role={loadError ? "alert" : "status"}>
+            <span>{loadError ? "服务端学习记录无法读取，已暂停修改和保存。请检查服务后重试。" : "正在读取学习记录，载入后即可开始练习。"}</span>
+            {loadError && <AppButton onClick={() => { setLoadError(false); setLoadAttempt((attempt) => attempt + 1); }}>重新读取</AppButton>}
+          </div>}
           {notice && <div className="notice" role="status"><span>{notice}</span><button aria-label="关闭提示" onClick={() => setNotice("")}><X size={15} /></button></div>}
           {view === "today" && <>
             <div className="page-title-row">
               <div><div className="eyebrow">{formatDate(new Date())}</div><h1>今日计划</h1><p>按自己的节奏完成今天的一小步。</p></div>
-              <AppButton variant="secondary" icon={Settings2} onClick={() => { setGoalDraft(data.profile); setSettingsOpen(true); }}>调整目标</AppButton>
+              <AppButton variant="secondary" icon={Settings2} onClick={openGoalSettings}>调整目标</AppButton>
             </div>
             <div className="today-layout">
               <div className="today-main-column">
@@ -386,14 +403,14 @@ export default function Home() {
 
               <aside className="today-aside">
                 <section className="aside-section goal-progress">
-                  <div className="aside-title-row"><span>每日目标</span><button className="icon-button" onClick={() => { setGoalDraft(data.profile); setSettingsOpen(true); }} aria-label="编辑每日目标"><Settings2 size={16} /></button></div>
+                  <div className="aside-title-row"><span>每日目标</span><button className="icon-button" onClick={openGoalSettings} aria-label="编辑每日目标"><Settings2 size={16} /></button></div>
                   <div className="goal-numbers"><strong>{todayMinutes}</strong><span>/ {data.profile.dailyTarget} 分钟</span></div>
                   <div className="progress-track"><span style={{ width: `${completion}%` }} /></div>
                   <div className="progress-caption"><span>{completion}% 完成</span><span>{todayDone} 项练习</span></div>
-                  <button className="goal-edit" onClick={() => { setGoalDraft(data.profile); setSettingsOpen(true); }}>调整每日时长 <ArrowRight size={14} /></button>
+                  <button className="goal-edit" onClick={openGoalSettings}>调整每日时长 <ArrowRight size={14} /></button>
                 </section>
                 <section className="aside-section target-summary">
-                  <div className="aside-title-row"><span>备考目标</span><button className="text-action compact" onClick={() => { setGoalDraft(data.profile); setSettingsOpen(true); }}>编辑</button></div>
+                  <div className="aside-title-row"><span>备考目标</span><button className="text-action compact" onClick={openGoalSettings}>编辑</button></div>
                   <div className="band-display"><strong>{data.profile.targetBand}</strong><span>目标总分</span><span className="band-pill">IELTS</span></div>
                   <div className="band-scale"><span>5.0</span><i><b style={{ left: `${Math.max(0, Math.min(100, (Number(data.profile.targetBand) - 5) * 25))}%` }} /></i><span>9.0</span></div>
                   <div className="exam-countdown"><CalendarDays size={15} /><span>{data.profile.examDate ? daysToExam(data.profile.examDate)! >= 0 ? `考试日期 ${data.profile.examDate} · 剩余 ${daysToExam(data.profile.examDate)} 天` : `考试日期 ${data.profile.examDate} · 已过期` : "添加考试日期，查看倒计时"}</span></div>
@@ -412,7 +429,7 @@ export default function Home() {
           {view === "practice" && <>
             {activeSkill ? <PracticeSession skill={activeSkill} answer={answer} setAnswer={setAnswer} result={sessionResult} onSubmit={submitSession} onBack={() => { setActiveSkill(null); setSessionResult(null); }} onPlay={playListening} /> : <>
               <div className="page-title-row"><div><div className="eyebrow">练习与模考</div><h1>练习中心</h1><p>按科目和可用时间选择一项，练习后查看解析。</p></div><span className="small-pill"><AlarmClock size={14} />按 10–20 分钟设计</span></div>
-              <div className="practice-overview"><div className="practice-overview-main"><span className="eyebrow">适合工作日的节奏</span><h2>一段专注时间，完成一个小目标。</h2><p>练习会自动计入今日计划。答错的题目进入错题复习，并影响下一次推荐。</p></div><div className="practice-overview-side"><strong>{data.profile.dailyTarget}</strong><span>每日目标 · 分钟</span><button className="text-action" onClick={() => { setGoalDraft(data.profile); setSettingsOpen(true); }}>调整 <ArrowRight size={14} /></button></div></div>
+              <div className="practice-overview"><div className="practice-overview-main"><span className="eyebrow">适合工作日的节奏</span><h2>一段专注时间，完成一个小目标。</h2><p>练习会自动计入今日计划。答错的题目进入错题复习，并影响下一次推荐。</p></div><div className="practice-overview-side"><strong>{data.profile.dailyTarget}</strong><span>每日目标 · 分钟</span><button className="text-action" onClick={openGoalSettings}>调整 <ArrowRight size={14} /></button></div></div>
               <section className="section-block practice-list-section"><SectionHeading eyebrow="选择科目" title="开始一项练习" /><div className="practice-cards">{skills.map(({ id, name, en, icon: Icon, tint, minutes }) => <article className="practice-card" key={id}><div className="practice-card-top"><span className={`skill-icon ${tint}`}><Icon size={20} /></span><span className="practice-count">{data.logs.filter((log) => log.skill === id).length} 次完成</span></div><h3>{name}<small>{en}</small></h3><p>{id === "listening" ? "场景对话、细节捕捉与同义表达辨认。" : id === "reading" ? "段落定位、题型策略与同义替换练习。" : id === "writing" ? "Task 1 / Task 2 写作，并获得四项标准反馈。" : "逐题作答、Part 2 个人陈述与表达复盘。"}</p><div className="practice-card-footer"><span><Clock3 size={14} />约 {minutes} 分钟</span><AppButton variant="secondary" icon={ArrowRight} onClick={() => startSkill(id)}>开始练习</AppButton></div></article>)}</div></section>
               <section className="section-block mock-section"><div className="mock-row"><div className="mock-icon"><FileText size={19} /></div><div><strong>完整模考</strong><p>将听力、阅读、写作组合为一次限时模考。建议在有完整时间时进行。</p></div><span className="coming-label">计划中</span></div></section>
             </>}
@@ -421,7 +438,7 @@ export default function Home() {
           {view === "review" && <>
             <div className="page-title-row"><div><div className="eyebrow">针对性巩固</div><h1>错题复练</h1><p>重新理解错误原因，再标记为已掌握。错题分布会调整你的今日建议。</p></div><span className="review-total"><strong>{pendingMistakes.length}</strong> 道待复习</span></div>
             <div className="filter-row" role="tablist" aria-label="筛选错题">{(["all", "listening", "reading", "writing", "speaking"] as const).map((filter) => <button role="tab" aria-selected={reviewFilter === filter} className={reviewFilter === filter ? "selected" : ""} key={filter} onClick={() => setReviewFilter(filter)}>{filter === "all" ? "全部" : skillNames[filter]}{filter !== "all" && <span>{pendingMistakes.filter((item) => item.skill === filter).length}</span>}</button>)}</div>
-            <div className="mistake-list">{pendingMistakes.filter((item) => reviewFilter === "all" || item.skill === reviewFilter).length ? pendingMistakes.filter((item) => reviewFilter === "all" || item.skill === reviewFilter).map((item) => <article className="mistake-row" key={item.id}><div className={`mistake-skill-mark ${skills.find((skill) => skill.id === item.skill)?.tint}`}>{item.skill === "reading" ? <BookOpen size={17} /> : item.skill === "listening" ? <Headphones size={17} /> : item.skill === "writing" ? <PencilLine size={17} /> : <Mic2 size={17} />}</div><div className="mistake-content"><div className="mistake-title-line"><span className="mistake-skill-label">{skillNames[item.skill]}</span><span className="mistake-date">{item.date}</span></div><h3>{item.question}</h3><p><strong>错误原因</strong> {item.reason}</p><div className="mistake-recall"><span>复习提示</span><span>先遮住解析，重新说出判断依据或改写答案。</span></div></div><button className="mastered-button" onClick={() => markMastered(item.id)}><Check size={15} />已掌握</button></article>) : <div className="empty-state"><div className="empty-state-icon"><CheckCheck size={23} /></div><h2>{pendingMistakes.length ? "这个科目暂时没有待复习错题" : "暂时没有待复习错题"}</h2><p>完成阅读或听力练习后，答错的题目会自动加入这里。</p><AppButton variant="secondary" icon={ArrowRight} onClick={() => setView("practice")}>去练习中心</AppButton></div>}</div>
+            <div className="mistake-list">{pendingMistakes.filter((item) => reviewFilter === "all" || item.skill === reviewFilter).length ? pendingMistakes.filter((item) => reviewFilter === "all" || item.skill === reviewFilter).map((item) => <article className="mistake-row" key={item.id}><div className={`mistake-skill-mark ${skills.find((skill) => skill.id === item.skill)?.tint}`}>{item.skill === "reading" ? <BookOpen size={17} /> : item.skill === "listening" ? <Headphones size={17} /> : item.skill === "writing" ? <PencilLine size={17} /> : <Mic2 size={17} />}</div><div className="mistake-content"><div className="mistake-title-line"><span className="mistake-skill-label">{skillNames[item.skill]}</span><span className="mistake-date">{item.date}</span></div><h3>{item.question}</h3><p><strong>错误原因</strong> {item.reason}</p><div className="mistake-recall"><span>复习提示</span><span>先遮住解析，重新说出判断依据或改写答案。</span></div></div><button className="mastered-button" disabled={!hydrated} onClick={() => markMastered(item.id)}><Check size={15} />已掌握</button></article>) : <div className="empty-state"><div className="empty-state-icon"><CheckCheck size={23} /></div><h2>{pendingMistakes.length ? "这个科目暂时没有待复习错题" : "暂时没有待复习错题"}</h2><p>完成阅读或听力练习后，答错的题目会自动加入这里。</p><AppButton variant="secondary" icon={ArrowRight} onClick={() => setView("practice")}>去练习中心</AppButton></div>}</div>
             {data.mistakes.some((item) => item.mastered) && <section className="mastered-section"><h2>已掌握 <span>{data.mistakes.filter((item) => item.mastered).length}</span></h2><p>这些题目已从待复习列表移除，仍保留在学习记录中。</p></section>}
           </>}
 
@@ -432,7 +449,7 @@ export default function Home() {
                 <div className="essay-prompt"><div className="prompt-label"><span>Task 2 练习题</span><span>观点讨论</span></div><p>Some people believe that employees should be given the right to work from home. Others think that working in an office is more effective. Discuss both views and give your own opinion.</p><div className="prompt-meta"><span>建议用时 40 分钟</span><span>至少 250 词</span></div></div>
                 <label className="essay-label" htmlFor="essay-text">你的作文</label>
                 <textarea id="essay-text" className="essay-input" value={essay} onChange={(event) => setEssay(event.target.value)} placeholder="在这里写下你的 Task 2 作文……" minLength={40} required />
-                <div className="essay-footer"><span>{essay.trim() ? essay.trim().split(/\s+/).length : 0} 词</span><AppButton type="submit" variant="primary" icon={Sparkles} disabled={feedbackLoading || essay.trim().length < 40}>{feedbackLoading ? "正在分析…" : "提交批改"}</AppButton></div>
+                <div className="essay-footer"><span>{essay.trim() ? essay.trim().split(/\s+/).length : 0} 词</span><AppButton type="submit" variant="primary" icon={Sparkles} disabled={!hydrated || feedbackLoading || essay.trim().length < 40}>{feedbackLoading ? "正在分析…" : "提交批改"}</AppButton></div>
                 {feedbackError && <div className="feedback-error" role="alert">{feedbackError}</div>}
                 <p className="privacy-note"><CircleHelp size={14} />提交后文本会发送至服务器配置的 AI 服务进行分析。不要提交个人敏感信息。</p>
               </form>
@@ -442,7 +459,7 @@ export default function Home() {
           </>}
 
           {view === "progress" && <>
-            <div className="page-title-row"><div><div className="eyebrow">记录与趋势</div><h1>学习进度</h1><p>回看练习时长、打卡和各科练习分布。</p></div><button className="goal-chip" onClick={() => { setGoalDraft(data.profile); setSettingsOpen(true); }}><Target size={15} />目标 {data.profile.targetBand}</button></div>
+            <div className="page-title-row"><div><div className="eyebrow">记录与趋势</div><h1>学习进度</h1><p>回看练习时长、打卡和各科练习分布。</p></div><button className="goal-chip" onClick={openGoalSettings}><Target size={15} />目标 {data.profile.targetBand}</button></div>
             <div className="stat-grid"><div className="stat-item"><span>本周练习</span><strong>{totalWeekMinutes}<small>分钟</small></strong><p>近 7 天累计学习时长</p></div><div className="stat-item"><span>完成练习</span><strong>{data.logs.length}<small>项</small></strong><p>听说读写练习记录</p></div><div className="stat-item"><span>连续打卡</span><strong>{streak}<small>天</small></strong><p>每天完成一项练习即可记录</p></div><div className="stat-item"><span>待复习错题</span><strong>{pendingMistakes.length}<small>道</small></strong><p>完成后可标记为已掌握</p></div></div>
             <div className="progress-layout"><section className="chart-section"><SectionHeading eyebrow="每日记录" title="近 7 天学习时长" description="按完成练习的预计时长统计。" /><div className="week-chart" role="img" aria-label="近七天学习分钟数柱状图">{weekDays.map((day) => <div className="chart-day" key={day.key}><strong>{day.minutes > 0 ? `${day.minutes}m` : ""}</strong><div className="chart-bar-track"><i style={{ height: `${day.minutes ? Math.max(8, (day.minutes / maxWeekMinutes) * 100) : 0}%` }} /></div><span>{day.label}</span></div>)}</div><div className="chart-footer"><span><i />每日学习时长</span><span>合计 {totalWeekMinutes} 分钟</span></div></section>
               <section className="distribution-section"><SectionHeading eyebrow="均衡练习" title="四科练习分布" /><div className="distribution-list">{skills.map(({ id, name, icon: Icon, tint }) => { const count = data.logs.filter((log) => log.skill === id).length; const pct = data.logs.length ? Math.round(count / data.logs.length * 100) : 0; return <div className="distribution-row" key={id}><span className={`distribution-icon ${tint}`}><Icon size={16} /></span><div className="distribution-detail"><div><strong>{name}</strong><span>{count} 次 · {pct}%</span></div><i><b style={{ width: `${pct}%` }} /></i></div></div>; })}</div></section></div>
@@ -451,8 +468,8 @@ export default function Home() {
         </div>
       </main>
 
-      {settingsOpen && <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setSettingsOpen(false); }}><section className="settings-modal" role="dialog" aria-modal="true" aria-labelledby="settings-title"><div className="modal-heading"><div><div className="eyebrow">备考设置</div><h2 id="settings-title">你的目标</h2></div><button className="icon-button modal-close" onClick={() => setSettingsOpen(false)} aria-label="关闭"><X size={18} /></button></div><form onSubmit={saveGoal} className="goal-form"><label>目标总分<select value={goalDraft.targetBand} onChange={(event) => setGoalDraft({ ...goalDraft, targetBand: event.target.value })}>{["5.0", "5.5", "6.0", "6.5", "7.0", "7.5", "8.0", "8.5", "9.0"].map((score) => <option key={score}>{score}</option>)}</select></label><label>考试日期<input type="date" value={goalDraft.examDate} onChange={(event) => setGoalDraft({ ...goalDraft, examDate: event.target.value })} /></label><fieldset><legend>每日学习目标</legend><div className="duration-options">{[15, 30, 45, 60, 90].map((minutes) => <button type="button" className={goalDraft.dailyTarget === minutes ? "selected" : ""} key={minutes} onClick={() => setGoalDraft({ ...goalDraft, dailyTarget: minutes })}>{minutes}<small>分</small></button>)}</div></fieldset><div className="modal-actions"><AppButton variant="secondary" onClick={() => setSettingsOpen(false)}>取消</AppButton><AppButton type="submit" variant="primary" icon={Check}>保存目标</AppButton></div></form></section></div>}
-      {!hydrated && <div className="loading-indicator" aria-label="正在载入学习记录" />}
+      {settingsOpen && <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setSettingsOpen(false); }}><section className="settings-modal" role="dialog" aria-modal="true" aria-labelledby="settings-title"><div className="modal-heading"><div><div className="eyebrow">备考设置</div><h2 id="settings-title">你的目标</h2></div><button className="icon-button modal-close" onClick={() => setSettingsOpen(false)} aria-label="关闭"><X size={18} /></button></div><form onSubmit={saveGoal} className="goal-form"><label>目标总分<select value={goalDraft.targetBand} onChange={(event) => setGoalDraft({ ...goalDraft, targetBand: event.target.value })}>{["5.0", "5.5", "6.0", "6.5", "7.0", "7.5", "8.0", "8.5", "9.0"].map((score) => <option key={score}>{score}</option>)}</select></label><label>考试日期<input type="date" value={goalDraft.examDate} onChange={(event) => setGoalDraft({ ...goalDraft, examDate: event.target.value })} /></label><fieldset><legend>每日学习目标</legend><div className="duration-options">{[15, 30, 45, 60, 90].map((minutes) => <button type="button" className={goalDraft.dailyTarget === minutes ? "selected" : ""} key={minutes} onClick={() => setGoalDraft({ ...goalDraft, dailyTarget: minutes })}>{minutes}<small>分</small></button>)}</div></fieldset><div className="modal-actions"><AppButton variant="secondary" onClick={() => setSettingsOpen(false)}>取消</AppButton><AppButton type="submit" variant="primary" icon={Check} disabled={!hydrated}>保存目标</AppButton></div></form></section></div>}
+      {!hydrated && !loadError && <div className="loading-indicator" aria-label="正在载入学习记录" />}
     </div>
   );
 }
