@@ -28,7 +28,12 @@ function reportFor(text: string) {
       evidenceMissing: fake && index === 0,
       suggestion: `第 ${index + 1} 项建议。`,
     })),
-    polish: [{ paragraph: 1, original: text, rewrite: `${text} This sentence has been revised for clarity.`, translation: "这是润色稿的中文翻译。" }],
+    polish: [{
+      paragraph: 1,
+      original: text,
+      rewrite: `${text.replace("Some people prefer working from home", "Some employees prefer remote work")} This sentence has been revised for clarity.`,
+      translation: "这是润色稿的中文翻译。",
+    }],
     nextStep: "下一次先写清每段中心句。",
   };
 }
@@ -75,7 +80,9 @@ test("writing feedback shows the server report and records a low-band mistake on
   await expect(page.getByText("42 词 · 未达建议长度（不扣分）")).toBeVisible();
   await expect(page.getByText("本项未找到可核验原文")).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "润色稿" })).toBeVisible();
-  await expect(page.getByText("中文翻译")).toBeVisible();
+  await expect(page.locator(".polish-translation span")).toHaveText("中文翻译");
+  await expect(page.locator(".polish-rewrite ins").first()).toBeVisible();
+  await expect(page.locator(".polish-rewrite del").first()).toBeVisible();
   await expect.poll(() => writes.at(-1)?.mistakes.length).toBe(0);
 
   await page.getByRole("button", { name: /错题复练/ }).first().click();

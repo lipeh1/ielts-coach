@@ -344,6 +344,8 @@ button:disabled { cursor: not-allowed; opacity: .52; }
 .polish-item { padding: 14px; border: 1px solid var(--border); border-radius: 7px; background: var(--surface); }
 .polish-heading { color: var(--text-secondary); font-size: 10px; font-weight: 600; }
 .polish-rewrite { margin-top: 8px; font-family: Georgia, "Times New Roman", var(--font-ui); font-size: 13px; line-height: 1.75; }
+.polish-rewrite ins { background: var(--danger-subtle); color: #b42318; text-decoration: none; }
+.polish-rewrite del { color: var(--text-tertiary); text-decoration: line-through; }
 .polish-translation { display: grid; gap: 4px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); color: var(--text-secondary); font-size: 11px; line-height: 1.7; }
 .polish-translation span { color: var(--text-tertiary); font-size: 9px; font-weight: 650; }
 .report-next-step { display: flex; align-items: flex-start; gap: 9px; margin-top: 12px; padding: 12px; border: 1px solid #cbdcf5; border-radius: 7px; background: var(--accent-subtle); color: #164f91; }

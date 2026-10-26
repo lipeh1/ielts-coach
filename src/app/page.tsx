@@ -28,9 +28,10 @@ import {
   Volume2,
   X,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import type { FeedbackCriterion, FeedbackReport } from "@/lib/feedback";
 import { defaultData, isValidState, type Profile, type SavedData, type Skill, type StudyLog } from "@/lib/study-data";
+import { diffWords } from "@/lib/word-diff";
 
 type View = "today" | "practice" | "review" | "feedback" | "progress";
 
@@ -494,11 +495,15 @@ export default function Home() {
                 </article>)}
               </div>
               {feedback.polish && feedback.polish.length > 0 && <section className="polish-section">
-                <SectionHeading eyebrow="逐段改写" title="润色稿" description="保留你的立场和论点，只调整表达与衔接。" />
+                <SectionHeading eyebrow="逐段改写" title="润色稿" description="红色为新增或改写，删除线为删掉的原文；下方附中文翻译。" />
                 <div className="polish-list">
                   {feedback.polish.map((paragraph) => <article className="polish-item" key={paragraph.paragraph}>
                     <div className="polish-heading">第 {paragraph.paragraph} 段</div>
-                    <div className="polish-rewrite">{paragraph.rewrite}</div>
+                    <div className="polish-rewrite">
+                      {diffWords(paragraph.original, paragraph.rewrite).map((token, index) => <Fragment key={index}>
+                        {token.type === "add" ? <ins>{token.text}</ins> : token.type === "remove" ? <del>{token.text}</del> : token.text}{" "}
+                      </Fragment>)}
+                    </div>
                     <div className="polish-translation"><span>中文翻译</span>{paragraph.translation}</div>
                   </article>)}
                 </div>
