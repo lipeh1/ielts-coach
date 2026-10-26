@@ -493,6 +493,16 @@ export default function Home() {
                   <div className="criterion-next"><span>下一步</span>{criterion.suggestion}</div>
                 </article>)}
               </div>
+              {feedback.polish && feedback.polish.length > 0 && <section className="polish-section">
+                <SectionHeading eyebrow="逐段改写" title="润色稿" description="保留你的立场和论点，只调整表达与衔接。" />
+                <div className="polish-list">
+                  {feedback.polish.map((paragraph) => <article className="polish-item" key={paragraph.paragraph}>
+                    <div className="polish-heading">第 {paragraph.paragraph} 段</div>
+                    <div className="polish-rewrite">{paragraph.rewrite}</div>
+                    <div className="polish-translation"><span>中文翻译</span>{paragraph.translation}</div>
+                  </article>)}
+                </div>
+              </section>}
               <div className="report-next-step"><Lightbulb size={17} /><div><strong>下一次练习</strong><p>{feedback.nextStep}</p></div></div>
             </section>}
           </>}

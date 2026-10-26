@@ -16,18 +16,30 @@ export type FeedbackCriterion = {
   suggestion: string;
 };
 
+export type PolishParagraph = {
+  paragraph: number;
+  original: string;
+  rewrite: string;
+  translation: string;
+};
+
 export type FeedbackReport = {
   demo: boolean;
   submissionId: string;
   wordCount: number;
   overallBand: number;
   criteria: FeedbackCriterion[];
+  polish: PolishParagraph[] | null;
   nextStep: string;
 };
 
 export function countWords(essay: string): number {
   const trimmed = essay.trim();
   return trimmed ? trimmed.split(/\s+/).length : 0;
+}
+
+export function splitParagraphs(essay: string): string[] {
+  return essay.trim().split(/\n\s*\n/).map((paragraph) => paragraph.trim()).filter(Boolean);
 }
 
 export function calculateOverallBand(bands: number[]): number {
@@ -44,7 +56,7 @@ function requireText(value: unknown, field: string): string {
 
 export function validateFeedback(raw: unknown, essay: string) {
   if (!raw || typeof raw !== "object") throw new Error("AI feedback is not an object");
-  const input = raw as { criteria?: unknown; nextStep?: unknown };
+  const input = raw as { criteria?: unknown; polish?: unknown; nextStep?: unknown };
   if (!Array.isArray(input.criteria) || input.criteria.length !== 4) {
     throw new Error("AI feedback must contain exactly four criteria");
   }
@@ -72,9 +84,26 @@ export function validateFeedback(raw: unknown, essay: string) {
     } satisfies FeedbackCriterion;
   });
 
+  const paragraphs = splitParagraphs(essay);
+  if (!Array.isArray(input.polish) || input.polish.length !== paragraphs.length) {
+    throw new Error("AI feedback must polish every essay paragraph");
+  }
+  const polish = input.polish.map((item, index) => {
+    if (!item || typeof item !== "object") throw new Error("AI polish item is not an object");
+    const paragraph = item as Record<string, unknown>;
+    if (paragraph.paragraph !== index + 1) throw new Error(`AI polish paragraph ${index + 1} is out of order`);
+    return {
+      paragraph: index + 1,
+      original: paragraphs[index],
+      rewrite: requireText(paragraph.rewrite, `polish paragraph ${index + 1} rewrite`),
+      translation: requireText(paragraph.translation, `polish paragraph ${index + 1} translation`),
+    } satisfies PolishParagraph;
+  });
+
   return {
     overallBand: calculateOverallBand(criteria.map((criterion) => criterion.band)),
     criteria,
+    polish,
     nextStep: requireText(input.nextStep, "nextStep"),
   };
 }
