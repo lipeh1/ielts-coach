@@ -9,6 +9,8 @@ const topics = new Set([
   "government", "economy", "media", "arts", "travel", "city", "nature", "daily",
   "emotion", "thinking", "sport", "history",
 ]);
+// The source corrected the headword but kept the old misspelled id.
+const idOverrides = new Map([["salution", "salutation"]]);
 
 const source = JSON.parse(await readFile(sourcePath, "utf8"));
 if (!Array.isArray(source)) throw new Error(`${sourcePath} must contain an array`);
@@ -17,8 +19,8 @@ const words = [];
 const seen = new Set();
 for (const entry of source) {
   if (!levels.has(entry.cefr)) continue;
-  const id = entry.id;
-  if (typeof id !== "string" || !id) throw new Error(`Entry is missing id: ${JSON.stringify(entry.w)}`);
+  if (typeof entry.id !== "string" || !entry.id) throw new Error(`Entry is missing id: ${JSON.stringify(entry.w)}`);
+  const id = idOverrides.get(entry.id) ?? entry.id;
   if (seen.has(id)) throw new Error(`Duplicate id: ${id}`);
   if (typeof entry.w !== "string" || !entry.w) throw new Error(`${id}: missing w`);
   if (typeof entry.uk !== "string" || typeof entry.us !== "string") throw new Error(`${id}: missing IPA`);
