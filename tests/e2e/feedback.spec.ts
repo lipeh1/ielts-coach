@@ -34,6 +34,7 @@ function reportFor(text: string) {
 
 async function mockApis(page: Page) {
   const writes: SavedData[] = [];
+  const feedbackBodies: { essay: string; prompt?: string }[] = [];
   await page.route("**/api/study", async (route) => {
     if (route.request().method() === "GET") {
       await route.fulfill({ json: { state: null } });
@@ -45,9 +46,11 @@ async function mockApis(page: Page) {
     }
   });
   await page.route("**/api/feedback", async (route) => {
-    await route.fulfill({ json: reportFor((route.request().postDataJSON() as { essay: string }).essay) });
+    const body = route.request().postDataJSON() as { essay: string; prompt?: string };
+    feedbackBodies.push(body);
+    await route.fulfill({ json: reportFor(body.essay) });
   });
-  return writes;
+  return { writes, feedbackBodies };
 }
 
 async function submit(page: Page, text: string) {
@@ -62,11 +65,12 @@ async function submit(page: Page, text: string) {
 }
 
 test("writing feedback shows the server report and records a low-band mistake only once", async ({ page }) => {
-  const writes = await mockApis(page);
+  const { writes, feedbackBodies } = await mockApis(page);
   await page.goto("/");
   await expect(page.getByText("正在读取学习记录，载入后即可开始练习。")).toHaveCount(0);
 
   await submit(page, essay);
+  expect(feedbackBodies.at(-1)?.prompt).toContain("Discuss both views");
   await expect(page.getByText("42 词 · 未达建议长度（不扣分）")).toBeVisible();
   await expect(page.getByText("本项未找到可核验原文")).toHaveCount(0);
   await expect.poll(() => writes.at(-1)?.mistakes.length).toBe(0);
