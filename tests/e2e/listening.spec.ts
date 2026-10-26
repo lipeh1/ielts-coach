@@ -72,7 +72,7 @@ test("full listening section plays once in exam mode and records a wrong answer"
   for (const question of section.questions) {
     if (question.type === "multiple-choice") {
       const card = page.locator(".reading-question").filter({ hasText: question.prompt });
-      const answer = question.number === 3 ? "A" : question.answer!;
+      const answer = question.number === 1 ? "B" : question.answer!;
       await card.getByRole("button", { name: new RegExp(`^${answer}\\.`) }).click();
     } else {
       await page.getByLabel(`Question ${question.number} answer`).fill(question.answers![0]);
@@ -89,16 +89,18 @@ test("full listening section plays once in exam mode and records a wrong answer"
   await expect(page.getByText("参考答案", { exact: true })).toBeVisible();
   await expect(page.getByText("查看听力原文", { exact: true })).toBeVisible();
 
-  await expect.poll(() => writes.length).toBe(1);
-  expect(writes[0].logs).toHaveLength(1);
-  expect(writes[0].logs[0]).toMatchObject({ skill: "listening", correct: 9, total: 10, minutes: 1 });
-  expect(writes[0].mistakes).toHaveLength(1);
-  expect(writes[0].mistakes[0]).toMatchObject({ id: "listening-01-q3", skill: "listening", mastered: false });
+  await expect.poll(() => writes.some((item) => item.logs.some((log) => log.skill === "listening"))).toBe(true);
+  const write = writes.find((item) => item.logs.some((log) => log.skill === "listening"))!;
+  expect(write.logs).toHaveLength(1);
+  expect(write.logs[0]).toMatchObject({ skill: "listening", correct: 9, total: 10, minutes: 1 });
+  expect(write.mistakes).toHaveLength(1);
+  expect(write.mistakes[0]).toMatchObject({ id: "listening-01-q1", skill: "listening", mastered: false });
+  await expect.poll(() => writes.some((item) => (item.vocabularyReviews ?? []).some((entry) => entry.source === "listening"))).toBe(true);
 
   await page.getByText("查看听力原文", { exact: true }).click();
   await expect(page.locator(".listening-transcript p").filter({ hasText: "The garden was created in 2005" })).toBeVisible();
 
   await page.getByRole("button", { name: "完成练习", exact: true }).click();
   await page.getByRole("button", { name: /错题复练/ }).first().click();
-  await expect(page.getByRole("heading", { name: /Listening Section 2 · Q3/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Listening Section 2 · Q1/ })).toBeVisible();
 });

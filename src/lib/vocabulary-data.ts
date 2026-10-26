@@ -22,6 +22,10 @@ export function findVocabularyWord(id: string): VocabularyWord | null {
   return byId.get(id) ?? null;
 }
 
+export function vocabularyWordList(): VocabularyWord[] {
+  return parsed.words;
+}
+
 export function listVocabulary(query: VocabularyQuery): VocabularyPage {
   return queryVocabulary(parsed.words, query);
 }

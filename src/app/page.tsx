@@ -326,6 +326,11 @@ export default function Home() {
       }
       return next;
     });
+    const wrongText = result.results
+      .filter((item) => !item.correct)
+      .map((item) => `${item.question.prompt}\n${item.question.explanation}\n${item.question.evidence}\n${item.expected}`)
+      .join("\n");
+    void addVocabularyFromText(wrongText, "reading");
     return result;
   }
 
@@ -358,6 +363,11 @@ export default function Home() {
       }
       return next;
     });
+    const wrongText = result.results
+      .filter((item) => !item.correct)
+      .map((item) => `${item.question.prompt}\n${item.question.explanation}\n${item.question.evidence}\n${item.expected}`)
+      .join("\n");
+    void addVocabularyFromText(wrongText, "listening");
     return result;
   }
 
@@ -389,6 +399,32 @@ export default function Home() {
     });
   }
 
+  async function addVocabularyFromText(text: string, source: VocabularyReviewSource) {
+    if (!hydrated || !text.trim()) return;
+    try {
+      const response = await fetch("/api/vocabulary/match", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text, limit: 5 }),
+      });
+      if (!response.ok) return;
+      const payload = await response.json() as { words?: VocabularyWord[] };
+      const matches = payload.words ?? [];
+      if (matches.length === 0) return;
+      const today = localDateKey();
+      setData((current) => {
+        const reviews = current.vocabularyReviews ?? [];
+        const additions = matches
+          .filter((word) => !reviews.some((entry) => entry.id === word.id))
+          .map((word) => createVocabularyReview(word.id, word.w, source, today));
+        if (additions.length === 0) return current;
+        return { ...current, vocabularyReviews: [...additions, ...reviews] };
+      });
+    } catch {
+      return;
+    }
+  }
+
   async function submitEssay(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!hydrated) return;
@@ -405,6 +441,10 @@ export default function Home() {
       setFeedbackMinutes(minutes);
       writingStartedAtRef.current = null;
       recordSession("writing", minutes, 0, 0);
+      if (!result.demo) {
+        const lr = result.criteria[2];
+        void addVocabularyFromText(`${lr.observation}\n${lr.suggestion}`, "writing");
+      }
       const weakest = result.criteria.reduce<FeedbackCriterion | null>(
         (lowest, criterion) => !lowest || criterion.band < lowest.band ? criterion : lowest,
         null,

@@ -23,10 +23,10 @@ function reportFor(text: string) {
     criteria: names.map((name, index) => ({
       name,
       band: bands[index],
-      observation: `第 ${index + 1} 项观察。`,
+      observation: index === 2 ? "Vocabulary could be more precise." : `第 ${index + 1} 项观察。`,
       evidence: fake && index === 0 ? "Not in the essay." : evidence[index],
       evidenceMissing: fake && index === 0,
-      suggestion: `第 ${index + 1} 项建议。`,
+      suggestion: index === 2 ? "Use precise vocabulary such as sustainable development." : `第 ${index + 1} 项建议。`,
     })),
     polish: [{
       paragraph: 1,
@@ -89,6 +89,7 @@ test("writing feedback shows the server report and records a low-band mistake on
   await expect.poll(() => writes.at(-1)?.mistakes.length).toBe(0);
   await expect.poll(() => writes.at(-1)?.feedbackHistory?.length).toBe(1);
   expect(writes.at(-1)?.logs[0]).toMatchObject({ skill: "writing", minutes: 1 });
+  await expect.poll(() => (writes.at(-1)?.vocabularyReviews ?? []).some((entry) => entry.id === "sustainable" && entry.source === "writing")).toBe(true);
 
   await page.getByRole("button", { name: /错题复练/ }).first().click();
   await expect(page.getByRole("heading", { name: "暂时没有待复习错题" })).toBeVisible();

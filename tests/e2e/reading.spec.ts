@@ -63,11 +63,13 @@ test("full reading passage grades 13 questions and records the wrong answer", as
   await expect(page.getByText("回答错误", { exact: true })).toHaveCount(1);
   await expect(page.getByText("参考答案", { exact: true })).toBeVisible();
 
-  await expect.poll(() => writes.length).toBe(1);
-  expect(writes[0].logs).toHaveLength(1);
-  expect(writes[0].logs[0]).toMatchObject({ skill: "reading", correct: 12, total: 13, minutes: 1 });
-  expect(writes[0].mistakes).toHaveLength(1);
-  expect(writes[0].mistakes[0]).toMatchObject({ id: "reading-01-q1", skill: "reading", mastered: false });
+  await expect.poll(() => writes.some((item) => item.logs.some((log) => log.skill === "reading"))).toBe(true);
+  const write = writes.find((item) => item.logs.some((log) => log.skill === "reading"))!;
+  expect(write.logs).toHaveLength(1);
+  expect(write.logs[0]).toMatchObject({ skill: "reading", correct: 12, total: 13, minutes: 1 });
+  expect(write.mistakes).toHaveLength(1);
+  expect(write.mistakes[0]).toMatchObject({ id: "reading-01-q1", skill: "reading", mastered: false });
+  await expect.poll(() => writes.some((item) => (item.vocabularyReviews ?? []).some((entry) => entry.source === "reading"))).toBe(true);
 
   await page.getByRole("button", { name: "完成练习", exact: true }).click();
   await page.getByRole("button", { name: /错题复练/ }).first().click();
