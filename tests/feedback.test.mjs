@@ -7,7 +7,7 @@ const source = await readFile(new URL("../src/lib/feedback.ts", import.meta.url)
 const { outputText } = ts.transpileModule(source, {
   compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2020 },
 });
-const { calculateOverallBand, countWords, splitParagraphs, validateFeedback } = await import(
+const { calculateOverallBand, countWords, normalizeEvidence, splitParagraphs, validateFeedback } = await import(
   `data:text/javascript;base64,${Buffer.from(outputText).toString("base64")}`
 );
 
@@ -77,6 +77,21 @@ test("blanks evidence that is not a verbatim substring and marks it missing", ()
   assert.equal(report.criteria[1].evidence, "");
   assert.equal(report.criteria[1].evidenceMissing, true);
   assert.equal(report.criteria[2].evidence, "collaboration");
+});
+
+test("normalizes quotes and whitespace when validating evidence", () => {
+  const raw = validFeedback();
+  raw.criteria[0].evidence = `“${raw.criteria[0].evidence}”`;
+  raw.criteria[1].evidence = raw.criteria[1].evidence.replace(/ /g, "   ");
+  const report = validateFeedback(raw, essay);
+  assert.equal(report.criteria[0].evidenceMissing, false);
+  assert.equal(report.criteria[1].evidenceMissing, false);
+  assert.equal(report.criteria[0].evidence, "Some people believe that remote work improves productivity.");
+
+  const ellipsis = validFeedback();
+  ellipsis.criteria[0].evidence = `${ellipsis.criteria[0].evidence} ...`;
+  assert.equal(validateFeedback(ellipsis, essay).criteria[0].evidenceMissing, true);
+  assert.equal(normalizeEvidence("  “Hello   world.”  "), "Hello world.");
 });
 
 test("rejects extra, renamed, reordered or non-object criteria", () => {

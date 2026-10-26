@@ -38,6 +38,17 @@ export function countWords(essay: string): number {
   return trimmed ? trimmed.split(/\s+/).length : 0;
 }
 
+export function normalizeEvidence(value: string): string {
+  return value
+    .trim()
+    .replace(/^["'“‘]+|["'”’]+$/g, "")
+    .replace(/[“”„‟]/g, '"')
+    .replace(/[‘’‚‛]/g, "'")
+    .replace(/[–—]/g, "-")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 export function splitParagraphs(essay: string): string[] {
   return essay.trim().split(/\n\s*\n/).map((paragraph) => paragraph.trim()).filter(Boolean);
 }
@@ -71,8 +82,8 @@ export function validateFeedback(raw: unknown, essay: string) {
     }
     if (typeof criterion.evidence !== "string") throw new Error(`AI feedback criterion ${expectedName} is missing evidence`);
 
-    const evidence = criterion.evidence.trim();
-    const evidenceMissing = !evidence || !essay.includes(evidence);
+    const evidence = normalizeEvidence(criterion.evidence);
+    const evidenceMissing = !evidence || !normalizeEvidence(essay).includes(evidence);
 
     return {
       name: expectedName,

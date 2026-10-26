@@ -19,10 +19,10 @@ pnpm dev
 OPENAI_API_KEY=your-api-key
 OPENAI_BASE_URL=https://api.openai.com/v1
 OPENAI_MODEL=gpt-4o-mini
-OPENAI_TIMEOUT_MS=120000
+OPENAI_TIMEOUT_MS=180000
 ```
 
-`OPENAI_TIMEOUT_MS` 单位为毫秒，默认 120000；推理型模型响应较慢时可适当调大。
+`OPENAI_TIMEOUT_MS` 单位为毫秒，默认 180000；推理型模型响应较慢时可适当调大。
 
 重启开发服务后，作文会经由 `/api/feedback` 服务端路由发送给所配置的模型。总分由服务端按四项平均并四舍五入到 0.5；无法在原文中核验的证据会被标记为缺失。报告同时包含逐段润色稿（新增/改写标红、删除线保留原文）和四项历史趋势；历史只记录真实 AI 批改。没有配置 API key 时，接口会返回明确标记的演示反馈，不会伪装成真实 AI 分析。练习分数均为备考参考，不代表官方考试成绩。
 
