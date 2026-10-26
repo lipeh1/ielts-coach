@@ -29,11 +29,10 @@ import {
   X,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import type { FeedbackCriterion, FeedbackReport } from "@/lib/feedback";
 import { defaultData, isValidState, type Profile, type SavedData, type Skill, type StudyLog } from "@/lib/study-data";
 
 type View = "today" | "practice" | "review" | "feedback" | "progress";
-type FeedbackCriterion = { name: string; band: number; observation: string; evidence: string; suggestion: string };
-type FeedbackReport = { demo: boolean; overallBand: number; criteria: FeedbackCriterion[]; nextStep: string };
 
 const skills: { id: Skill; name: string; en: string; icon: typeof BookOpen; tint: string; minutes: number }[] = [
   { id: "listening", name: "听力", en: "Listening", icon: Headphones, tint: "blue", minutes: 12 },
@@ -289,12 +288,30 @@ export default function Home() {
     setFeedback(null);
     try {
       const response = await fetch("/api/feedback", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ essay }) });
-      const result = await response.json();
+      const result = await response.json() as FeedbackReport & { error?: string };
       if (!response.ok) throw new Error(result.error || "批改暂时不可用，请稍后重试。");
-      setFeedback(result as FeedbackReport);
+      setFeedback(result);
       recordSession("writing", 20, 0, 0);
-      const firstSuggestion = result.criteria?.[0]?.suggestion || "复查论点与段落之间的逻辑关系。";
-      setData((current) => ({ ...current, mistakes: [{ id: crypto.randomUUID(), skill: "writing", question: "Writing Task 2 · 论证与段落展开", reason: firstSuggestion, date: localDateKey(), mastered: false }, ...current.mistakes] }));
+      const weakest = result.criteria.reduce<FeedbackCriterion | null>(
+        (lowest, criterion) => !lowest || criterion.band < lowest.band ? criterion : lowest,
+        null,
+      );
+      if (weakest && weakest.band <= 5.5) {
+        setData((current) => {
+          if (current.mistakes.some((item) => item.id === result.submissionId)) return current;
+          return {
+            ...current,
+            mistakes: [{
+              id: result.submissionId,
+              skill: "writing",
+              question: `Writing Task 2 · ${weakest.name}`,
+              reason: weakest.suggestion,
+              date: localDateKey(),
+              mastered: false,
+            }, ...current.mistakes],
+          };
+        });
+      }
     } catch (error) {
       setFeedbackError(error instanceof Error ? error.message : "批改暂时不可用，请稍后重试。");
     } finally {
@@ -449,13 +466,33 @@ export default function Home() {
                 <div className="essay-prompt"><div className="prompt-label"><span>Task 2 练习题</span><span>观点讨论</span></div><p>Some people believe that employees should be given the right to work from home. Others think that working in an office is more effective. Discuss both views and give your own opinion.</p><div className="prompt-meta"><span>建议用时 40 分钟</span><span>至少 250 词</span></div></div>
                 <label className="essay-label" htmlFor="essay-text">你的作文</label>
                 <textarea id="essay-text" className="essay-input" value={essay} onChange={(event) => setEssay(event.target.value)} placeholder="在这里写下你的 Task 2 作文……" minLength={40} required />
-                <div className="essay-footer"><span>{essay.trim() ? essay.trim().split(/\s+/).length : 0} 词</span><AppButton type="submit" variant="primary" icon={Sparkles} disabled={!hydrated || feedbackLoading || essay.trim().length < 40}>{feedbackLoading ? "正在分析…" : "提交批改"}</AppButton></div>
+                <div className="essay-footer"><span>输入统计 {essay.trim() ? essay.trim().split(/\s+/).length : 0} 词</span><AppButton type="submit" variant="primary" icon={Sparkles} disabled={!hydrated || feedbackLoading || essay.trim().length < 40}>{feedbackLoading ? "正在分析…" : "提交批改"}</AppButton></div>
                 {feedbackError && <div className="feedback-error" role="alert">{feedbackError}</div>}
                 <p className="privacy-note"><CircleHelp size={14} />提交后文本会发送至服务器配置的 AI 服务进行分析。不要提交个人敏感信息。</p>
               </form>
               <aside className="feedback-aside"><div className="feedback-aside-heading"><Sparkles size={17} /><strong>反馈包含</strong></div><ul><li><span>TR</span><div><strong>任务回应</strong><small>立场、切题程度与论证</small></div></li><li><span>CC</span><div><strong>连贯与衔接</strong><small>段落组织与逻辑推进</small></div></li><li><span>LR</span><div><strong>词汇资源</strong><small>准确度、搭配与变化</small></div></li><li><span>GRA</span><div><strong>语法多样性与准确性</strong><small>句式控制与错误模式</small></div></li></ul><div className="feedback-disclaimer"><Lightbulb size={15} /><p>估分用于练习参考，不代表官方考试成绩。反馈会引用作文原文，帮助你核对判断依据。</p></div></aside>
             </div>
-            {feedback && <section className="feedback-report"><div className="report-heading"><div><div className="eyebrow">批改完成 {feedback.demo && "· 演示反馈"}</div><h2>你的写作反馈</h2></div><div className="report-band"><strong>{feedback.overallBand.toFixed(1)}</strong><span>练习估分</span></div></div>{feedback.demo && <div className="demo-note">当前为演示反馈。配置服务端 AI 环境变量后，这里会显示基于你作文内容生成的分析。</div>}<div className="criteria-grid">{feedback.criteria.map((criterion) => <article className="criterion" key={criterion.name}><div className="criterion-heading"><span>{criterion.name}</span><strong>{criterion.band.toFixed(1)}</strong></div><p>{criterion.observation}</p><blockquote>“{criterion.evidence}”</blockquote><div className="criterion-next"><span>下一步</span>{criterion.suggestion}</div></article>)}</div><div className="report-next-step"><Lightbulb size={17} /><div><strong>下一次练习</strong><p>{feedback.nextStep}</p></div></div></section>}
+            {feedback && <section className="feedback-report">
+              <div className="report-heading">
+                <div><div className="eyebrow">批改完成 {feedback.demo && "· 演示反馈"}</div><h2>你的写作反馈</h2></div>
+                <div className="report-band">
+                  <strong>{feedback.overallBand.toFixed(1)}</strong><span>练习估分</span>
+                  <small className={feedback.wordCount < 250 ? "word-count-warning" : ""}>{feedback.wordCount} 词{feedback.wordCount < 250 ? " · 未达建议长度（不扣分）" : ""}</small>
+                </div>
+              </div>
+              {feedback.demo && <div className="demo-note">当前为演示反馈。配置服务端 AI 环境变量后，这里会显示基于你作文内容生成的分析。</div>}
+              <div className="criteria-grid">
+                {feedback.criteria.map((criterion) => <article className="criterion" key={criterion.name}>
+                  <div className="criterion-heading"><span>{criterion.name}</span><strong>{criterion.band.toFixed(1)}</strong></div>
+                  <p>{criterion.observation}</p>
+                  {criterion.evidenceMissing
+                    ? <div className="criterion-evidence-missing">本项未找到可核验原文</div>
+                    : <blockquote>“{criterion.evidence}”</blockquote>}
+                  <div className="criterion-next"><span>下一步</span>{criterion.suggestion}</div>
+                </article>)}
+              </div>
+              <div className="report-next-step"><Lightbulb size={17} /><div><strong>下一次练习</strong><p>{feedback.nextStep}</p></div></div>
+            </section>}
           </>}
 
           {view === "progress" && <>

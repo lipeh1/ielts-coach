@@ -21,13 +21,29 @@ OPENAI_BASE_URL=https://api.openai.com/v1
 OPENAI_MODEL=gpt-4o-mini
 ```
 
-重启开发服务后，作文会经由 `/api/feedback` 服务端路由发送给所配置的模型。没有配置 API key 时，接口会返回明确标记的演示反馈，不会伪装成真实 AI 分析。练习分数均为备考参考，不代表官方考试成绩。
+重启开发服务后，作文会经由 `/api/feedback` 服务端路由发送给所配置的模型。总分由服务端按四项平均并四舍五入到 0.5；无法在原文中核验的证据会被标记为缺失。没有配置 API key 时，接口会返回明确标记的演示反馈，不会伪装成真实 AI 分析。练习分数均为备考参考，不代表官方考试成绩。
 
 ## 学习记录
 
 目标、打卡、练习记录和错题只通过 `/api/study` 读写，由 Next.js 服务端保存在 `data/study-state.json`；浏览器不保存学习数据副本。此文件存储适用于单用户本地使用；部署到无持久磁盘或多实例环境前，需要换成共享数据库。AI API key 只应放在 `.env.local`，不要放入浏览器代码或提交到版本控制。
 
 只有成功读取合法学习记录（或确认尚无记录）后才能开始修改和保存。读取失败时页面暂停写入，可点击“重新读取”；初始载入不会自动写回。保存提示以服务端响应为准。`data/` 不纳入 Git，请单独备份学习记录。
+
+## 词汇数据
+
+`src/data/vocabulary.json` 是 Word Atlas 的 B2/C1 子集，共 3,735 个词条，许可为 CC BY 4.0，署名为 “Word Atlas contributors”。重新生成：
+
+```bash
+node scripts/fetch-word-atlas.mjs
+node scripts/build-vocabulary.mjs
+```
+
+`GET /api/vocabulary` 支持 `q`、`cefr`、`topic`、`page`、`pageSize`，传 `id` 返回单个词条：
+
+```bash
+curl "http://localhost:7500/api/vocabulary?cefr=B2&topic=education&pageSize=5"
+curl "http://localhost:7500/api/vocabulary?id=motivate"
+```
 
 ## 检查
 

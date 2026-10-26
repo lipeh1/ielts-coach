@@ -1,28 +1,46 @@
+import { createHash } from "node:crypto";
 import { NextResponse } from "next/server";
+import {
+  calculateOverallBand,
+  countWords,
+  criterionNames,
+  validateFeedback,
+  type FeedbackCriterion,
+  type FeedbackReport,
+} from "@/lib/feedback";
 
-type Criterion = { name: string; band: number; observation: string; evidence: string; suggestion: string };
+function createSubmissionId(essay: string) {
+  const normalized = essay.replace(/\s+/g, " ").trim();
+  return `writing-${createHash("sha256").update(normalized).digest("hex").slice(0, 24)}`;
+}
 
-const criteriaNames = ["TR · 任务回应", "CC · 连贯与衔接", "LR · 词汇资源", "GRA · 语法多样性与准确性"];
+function demoReport(essay: string, submissionId: string): FeedbackReport {
+  const wordCount = countWords(essay);
+  const excerpt = essay.slice(0, 110);
+  const criteria = criterionNames.map((name) => ({
+    name,
+    band: 6,
+    observation: "这是演示结构，尚未调用 AI 分析你的作文。配置服务端模型后会生成对应维度的实际反馈。",
+    evidence: excerpt,
+    evidenceMissing: excerpt.length === 0,
+    suggestion: "先明确段落中心句，再用具体理由或例子展开，并检查是否回应题目要求。",
+  } satisfies FeedbackCriterion));
 
-function demoReport(essay: string) {
-  const wordCount = essay.trim().split(/\s+/).filter(Boolean).length;
   return {
     demo: true,
-    overallBand: 6,
-    criteria: criteriaNames.map((name) => ({
-      name,
-      band: 6,
-      observation: "这是演示结构，尚未调用 AI 分析你的作文。配置服务端模型后会生成对应维度的实际反馈。",
-      evidence: essay.trim().slice(0, 110) || "提交作文后，这里会引用你的原文。",
-      suggestion: "先明确段落中心句，再用具体理由或例子展开，并检查是否回应题目要求。",
-    } satisfies Criterion)),
-    nextStep: wordCount < 250 ? `当前约 ${wordCount} 词。先补全论证并达到题目建议的 250 词，再检查段落结构。` : "配置 AI 服务后，可根据你的主要失分点生成针对性的下一次练习。",
+    submissionId,
+    wordCount,
+    overallBand: calculateOverallBand(criteria.map((criterion) => criterion.band)),
+    criteria,
+    nextStep: wordCount < 250
+      ? `当前约 ${wordCount} 词。先补全论证并达到题目建议的 250 词，再检查段落结构。`
+      : "配置 AI 服务后，可根据你的主要失分点生成针对性的下一次练习。",
   };
 }
 
-function parseModelResponse(content: string) {
+function parseModelResponse(content: string): unknown {
   const cleaned = content.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
-  return JSON.parse(cleaned) as { overallBand?: unknown; criteria?: unknown; nextStep?: unknown };
+  return JSON.parse(cleaned) as unknown;
 }
 
 export async function POST(request: Request) {
@@ -37,8 +55,9 @@ export async function POST(request: Request) {
   if (essay.length < 40) return NextResponse.json({ error: "作文内容太短，请至少输入 40 个字符。" }, { status: 400 });
   if (essay.length > 14_000) return NextResponse.json({ error: "作文超过可处理长度，请精简后再提交。" }, { status: 413 });
 
+  const submissionId = createSubmissionId(essay);
   const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) return NextResponse.json(demoReport(essay));
+  if (!apiKey) return NextResponse.json(demoReport(essay, submissionId));
 
   const baseUrl = (process.env.OPENAI_BASE_URL || "https://api.openai.com/v1").replace(/\/+$/, "");
   const model = process.env.OPENAI_MODEL || "gpt-4o-mini";
@@ -57,8 +76,8 @@ export async function POST(request: Request) {
           additionalProperties: false,
           required: ["name", "band", "observation", "evidence", "suggestion"],
           properties: {
-            name: { type: "string" },
-            band: { type: "number", minimum: 0, maximum: 9 },
+            name: { type: "string", enum: [...criterionNames] },
+            band: { type: "integer", minimum: 0, maximum: 9 },
             observation: { type: "string" },
             evidence: { type: "string" },
             suggestion: { type: "string" },
@@ -80,7 +99,7 @@ export async function POST(request: Request) {
         messages: [
           {
             role: "system",
-            content: "你是一位谨慎的雅思 Academic Writing Task 2 练习教练。按 IELTS 四项标准给出非官方练习估分。不得编造原文证据；每项 evidence 必须是作文中连续、可核验的原文片段；若确实没有合适片段，指出缺失而不伪造。使用简体中文解释，例句保留英文。反馈具体、可执行，不要整篇代写。四项分别为 TR、CC、LR、GRA。JSON 字段 name 应使用“TR · 任务回应”、“CC · 连贯与衔接”、“LR · 词汇资源”、“GRA · 语法多样性与准确性”。",
+            content: "你是一位谨慎的雅思 Academic Writing Task 2 练习教练。按 IELTS 四项标准给出非官方练习估分。不得编造原文证据；每项 evidence 必须是作文中连续、可核验的原文片段；若确实没有合适片段，返回空字符串。使用简体中文解释，例句保留英文。反馈具体、可执行，不要整篇代写。四项顺序固定为 TR、CC、LR、GRA，name 必须依次使用“TR · 任务回应”、“CC · 连贯与衔接”、“LR · 词汇资源”、“GRA · 语法多样性与准确性”。每项 band 必须是 0–9 的整数，不要返回小数。overallBand 不会被采用，服务端会根据四项重新计算。",
           },
           { role: "user", content: `请批改下面的 IELTS Writing Task 2 作文。只给估算的练习分数，不声称是官方结果。\n\n${essay}` },
         ],
@@ -97,13 +116,13 @@ export async function POST(request: Request) {
     const payload = await response.json() as { choices?: { message?: { content?: string } }[] };
     const content = payload.choices?.[0]?.message?.content;
     if (!content) throw new Error("AI service returned an empty response");
-    const parsed = parseModelResponse(content);
-    const overallBand = Number(parsed.overallBand);
-    const criteria = parsed.criteria;
-    if (!Number.isFinite(overallBand) || !Array.isArray(criteria) || criteria.length !== 4 || typeof parsed.nextStep !== "string") {
-      throw new Error("AI service returned an invalid feedback structure");
-    }
-    return NextResponse.json({ demo: false, overallBand, criteria, nextStep: parsed.nextStep });
+    const feedback = validateFeedback(parseModelResponse(content), essay);
+    return NextResponse.json({
+      demo: false,
+      submissionId,
+      wordCount: countWords(essay),
+      ...feedback,
+    });
   } catch (error) {
     console.error("Writing feedback failed", error);
     return NextResponse.json({ error: error instanceof Error && error.name === "TimeoutError" ? "AI 批改超时，请稍后重试。" : "未能解析 AI 批改结果，请稍后重试。" }, { status: 502 });
