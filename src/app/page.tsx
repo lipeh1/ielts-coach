@@ -23,6 +23,7 @@ import {
   RotateCcw,
   Settings2,
   Sparkles,
+  Square,
   Target,
   TrendingUp,
   Volume2,
@@ -77,6 +78,10 @@ function localDateKey(date = new Date()) {
 
 function formatDate(date: Date) {
   return new Intl.DateTimeFormat("zh-CN", { month: "long", day: "numeric", weekday: "long" }).format(date);
+}
+
+function formatDuration(seconds: number) {
+  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
 }
 
 function daysToExam(examDate: string) {
@@ -273,8 +278,8 @@ export default function Home() {
     setData((current) => ({ ...current, logs: [...current.logs, log], checkIns: current.checkIns.includes(today) ? current.checkIns : [...current.checkIns, today] }));
   }
 
-  function submitSession() {
-    if (!hydrated || activeSkill !== "speaking" || !answer || sessionResult) return;
+  function submitSession(hasRecording: boolean) {
+    if (!hydrated || activeSkill !== "speaking" || (!answer && !hasRecording) || sessionResult) return;
     setSessionResult({ correct: true, explanation: "完成了一次口语练习。试着回听自己的回答，检查是否先给出观点，再用细节或例子展开。" });
     recordSession("speaking", 8, 0, 0);
   }
@@ -881,9 +886,84 @@ function SpeakingSession({ answer, setAnswer, result, onSubmit, onBack }: {
   answer: string;
   setAnswer: (value: string) => void;
   result: { correct: boolean; explanation: string } | null;
-  onSubmit: () => void;
+  onSubmit: (hasRecording: boolean) => void;
   onBack: () => void;
 }) {
+  const [recordingState, setRecordingState] = useState<"idle" | "recording" | "recorded">("idle");
+  const [elapsed, setElapsed] = useState(0);
+  const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [recordingError, setRecordingError] = useState("");
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+  const timerRef = useRef<number | null>(null);
+  const audioUrlRef = useRef<string | null>(null);
+
+  function setRecordingUrl(url: string | null) {
+    if (audioUrlRef.current) URL.revokeObjectURL(audioUrlRef.current);
+    audioUrlRef.current = url;
+    setAudioUrl(url);
+  }
+
+  useEffect(() => () => {
+    if (timerRef.current !== null) window.clearInterval(timerRef.current);
+    const recorder = recorderRef.current;
+    if (recorder && recorder.state !== "inactive") {
+      recorder.onstop = null;
+      recorder.stop();
+    }
+    streamRef.current?.getTracks().forEach((track) => track.stop());
+    if (audioUrlRef.current) URL.revokeObjectURL(audioUrlRef.current);
+  }, []);
+
+  async function startRecording() {
+    if (result) return;
+    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
+      setRecordingError("此浏览器暂不支持录音，请更换浏览器。");
+      return;
+    }
+    try {
+      setRecordingError("");
+      setRecordingUrl(null);
+      setElapsed(0);
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
+      chunksRef.current = [];
+      const recorder = new MediaRecorder(stream);
+      recorderRef.current = recorder;
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) chunksRef.current.push(event.data);
+      };
+      recorder.onstop = () => {
+        const blob = new Blob(chunksRef.current, { type: recorder.mimeType || "audio/webm" });
+        setRecordingUrl(URL.createObjectURL(blob));
+        setRecordingState("recorded");
+        stream.getTracks().forEach((track) => track.stop());
+        streamRef.current = null;
+        if (timerRef.current !== null) {
+          window.clearInterval(timerRef.current);
+          timerRef.current = null;
+        }
+      };
+      recorder.start();
+      setRecordingState("recording");
+      const startedAt = Date.now();
+      timerRef.current = window.setInterval(() => {
+        const seconds = Math.min(120, Math.floor((Date.now() - startedAt) / 1000));
+        setElapsed(seconds);
+        if (seconds >= 120 && recorder.state !== "inactive") recorder.stop();
+      }, 250);
+    } catch {
+      setRecordingState("idle");
+      setRecordingError("无法访问麦克风，请检查浏览器权限，或使用 localhost/HTTPS 打开页面。");
+    }
+  }
+
+  function stopRecording() {
+    const recorder = recorderRef.current;
+    if (recorder && recorder.state !== "inactive") recorder.stop();
+  }
+
   return <>
     <button className="back-link" onClick={onBack}><ArrowLeft size={16} />返回练习中心</button>
     <div className="practice-session-heading">
@@ -894,16 +974,31 @@ function SpeakingSession({ answer, setAnswer, result, onSubmit, onBack }: {
       <section className="question-panel">
         <div className="passage-label"><Mic2 size={15} />Speaking · Part 2</div>
         <div className="speaking-prompt"><div className="prompt-label">Describe a skill you learned recently</div><p>You should say:</p><ul><li>what the skill is</li><li>how you learned it</li><li>why you decided to learn it</li><li>and explain how you felt about learning it</li></ul><span><Clock3 size={14} />1 minute to prepare · speak for up to 2 minutes</span></div>
+        <div className="recording-panel">
+          <div className="recording-status">
+            <span className={`recording-dot ${recordingState === "recording" ? "active" : ""}`} />
+            <strong>{recordingState === "recording" ? "正在录音" : recordingState === "recorded" ? "录音完成" : "准备录音"}</strong>
+            <span>{formatDuration(elapsed)} / 2:00</span>
+          </div>
+          <div className="recording-actions">
+            {recordingState === "recording"
+              ? <AppButton variant="secondary" icon={Square} onClick={stopRecording} disabled={!!result}>停止录音</AppButton>
+              : <AppButton variant="secondary" icon={Mic2} onClick={startRecording} disabled={!!result}>{recordingState === "recorded" ? "重新录音" : "开始录音"}</AppButton>}
+          </div>
+          {audioUrl && <audio className="recording-playback" controls src={audioUrl} />}
+          {recordingError && <p className="recording-error" role="alert">{recordingError}</p>}
+          <p className="recording-note">录音只保存在当前浏览器页面，不会上传；最长 2 分钟。</p>
+        </div>
         <label className="answer-label" htmlFor="speaking-answer">练习后记录你的回答要点</label>
         <textarea id="speaking-answer" className="speaking-answer" value={answer} onChange={(event) => setAnswer(event.target.value)} placeholder="可以用英文记录你的回答，也可以先口头练习，再写下关键词……" disabled={!!result} />
         {result && <div className="answer-feedback correct" role="status"><div className="answer-feedback-title"><Check size={17} />练习完成</div><p>{result.explanation}</p></div>}
-        <div className="session-actions">{result ? <AppButton variant="primary" icon={ArrowRight} onClick={onBack}>完成练习</AppButton> : <AppButton variant="primary" icon={Check} onClick={onSubmit} disabled={!answer}>完成口语练习</AppButton>}<span>练习结果会计入今日目标</span></div>
+        <div className="session-actions">{result ? <AppButton variant="primary" icon={ArrowRight} onClick={onBack}>完成练习</AppButton> : <AppButton variant="primary" icon={Check} onClick={() => onSubmit(!!audioUrl)} disabled={(!answer && !audioUrl) || recordingState === "recording"}>完成口语练习</AppButton>}<span>练习结果会计入今日目标</span></div>
       </section>
       <aside className="session-help">
         <div className="help-heading"><Lightbulb size={17} /><strong>答题提醒</strong></div>
         <p>保持自然表达，不需要把提示卡上的每一条都回答成独立短句。</p>
         <div className="help-point"><strong>结构</strong><span>先回答主题，再用一段经历或例子展开。</span></div>
-        <div className="help-point"><strong>复盘</strong><span>留意停顿、重复词和回答是否偏题。</span></div>
+        <div className="help-point"><strong>复盘</strong><span>听完录音后，留意停顿、重复词和回答是否偏题。</span></div>
       </aside>
     </div>
   </>;
