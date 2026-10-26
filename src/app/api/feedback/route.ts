@@ -61,6 +61,7 @@ export async function POST(request: Request) {
 
   const baseUrl = (process.env.OPENAI_BASE_URL || "https://api.openai.com/v1").replace(/\/+$/, "");
   const model = process.env.OPENAI_MODEL || "gpt-4o-mini";
+  const timeoutMs = Math.min(300_000, Math.max(5_000, Number(process.env.OPENAI_TIMEOUT_MS) || 120_000));
   const schema = {
     type: "object",
     additionalProperties: false,
@@ -105,7 +106,7 @@ export async function POST(request: Request) {
         ],
       }),
       cache: "no-store",
-      signal: AbortSignal.timeout(45_000),
+      signal: AbortSignal.timeout(timeoutMs),
     });
     if (!response.ok) {
       const detail = await response.text();
