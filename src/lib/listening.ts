@@ -29,6 +29,7 @@ export type ListeningSection = {
   title: string;
   audioMinutes: number;
   practiceMinutes: number;
+  audioFile?: string;
   script: string[];
   questions: ListeningQuestion[];
 };

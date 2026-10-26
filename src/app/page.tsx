@@ -936,6 +936,7 @@ function ListeningSession({ section, ready, onSubmit, onBack }: {
     startedAtRef.current = Date.now();
   }, []);
   const [submittedMinutes, setSubmittedMinutes] = useState<number | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const mcQuestions = section.questions.filter((question): question is ListeningMultipleChoiceQuestion => question.type === "multiple-choice");
   const completionQuestions = section.questions.filter((question): question is ListeningCompletionQuestion => question.type === "note-completion");
@@ -946,11 +947,29 @@ function ListeningSession({ section, ready, onSubmit, onBack }: {
   }, []);
 
   function play() {
-    if (typeof window === "undefined" || !("speechSynthesis" in window) || typeof SpeechSynthesisUtterance === "undefined") {
+    if (typeof window === "undefined") return;
+    if (playing || (mode === "exam" && hasPlayed)) return;
+    if (section.audioFile) {
+      const audio = audioRef.current;
+      if (!audio) {
+        setAudioError("录音文件尚未加载，请稍后重试。");
+        return;
+      }
+      setAudioError("");
+      setPlaying(true);
+      setHasPlayed(true);
+      audio.currentTime = 0;
+      void audio.play().catch(() => {
+        setPlaying(false);
+        setHasPlayed(false);
+        setAudioError("录音播放失败，请检查音频文件路径。");
+      });
+      return;
+    }
+    if (!("speechSynthesis" in window) || typeof SpeechSynthesisUtterance === "undefined") {
       setAudioError("此浏览器暂不支持语音播放，请更换浏览器或检查语音设置。");
       return;
     }
-    if (playing || (mode === "exam" && hasPlayed)) return;
     window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(section.script.join("\n\n"));
     utterance.lang = "en-GB";
@@ -990,7 +1009,7 @@ function ListeningSession({ section, ready, onSubmit, onBack }: {
       <span className="session-timer"><Clock3 size={15} />音频约 {section.audioMinutes} 分钟 · 练习约 {section.practiceMinutes} 分钟</span>
     </div>
     <section className="listening-audio-panel">
-      <div className="passage-label"><Headphones size={15} />Listening · Section 2</div>
+      <div className="passage-label"><Headphones size={15} />Listening · Section 2 · {section.audioFile ? "真人录音" : "浏览器语音"}</div>
       <div className="listening-mode" role="group" aria-label="收听模式">
         <button type="button" className={mode === "practice" ? "selected" : ""} onClick={() => setMode("practice")} disabled={playing || hasPlayed}>练习模式 · 可重复</button>
         <button type="button" className={mode === "exam" ? "selected" : ""} onClick={() => setMode("exam")} disabled={playing || hasPlayed}>考试模式 · 只播一遍</button>
@@ -1000,7 +1019,12 @@ function ListeningSession({ section, ready, onSubmit, onBack }: {
         <div className={`audio-wave ${playing ? "playing" : ""}`} aria-hidden="true">{Array.from({ length: 42 }, (_, index) => <i key={index} style={{ height: `${12 + ((index * 17) % 29)}px` }} />)}</div>
         <span>{playing ? "播放中…" : mode === "exam" && hasPlayed ? "已播放一次" : `约 ${section.audioMinutes} 分钟`}</span>
       </div>
-      <p className="audio-hint">{mode === "exam" ? "考试模式：录音只能播放一次，离开本页后可重新开始。" : "练习模式：可以反复收听。"}</p>
+      {section.audioFile && <audio ref={audioRef} src={section.audioFile} onEnded={() => setPlaying(false)} onError={() => {
+        setPlaying(false);
+        setHasPlayed(false);
+        setAudioError("录音文件无法播放，请检查路径。");
+      }} preload="auto" hidden />}
+      <p className="audio-hint">{mode === "exam" ? "考试模式：音频只能播放一次，离开本页后可重新开始。" : "练习模式：可以反复收听。"}</p>
       {audioError && <p className="audio-error" role="alert">{audioError}</p>}
       {result && <details className="listening-transcript"><summary>查看听力原文</summary>{section.script.map((paragraph, index) => <p key={index}>{paragraph}</p>)}</details>}
     </section>
