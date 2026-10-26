@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page, type Route } from "@playwright/test";
+import { readFile } from "node:fs/promises";
 import type { SavedData } from "../../src/lib/study-data";
 
 const emptyState = (): SavedData => ({
@@ -127,6 +128,25 @@ test("speaking practice records a completed session without mistakes", async ({ 
   await expect.poll(() => writes.length).toBe(1);
   expect(writes[0].logs[0]).toMatchObject({ skill: "speaking", minutes: 1, correct: 0, total: 0 });
   expect(writes[0].mistakes).toHaveLength(0);
+});
+
+test("exports the loaded study state as a JSON backup", async ({ page }) => {
+  const state = populatedState();
+  const writes = await mockStudy(page, (route) => route.fulfill({ json: { state } }));
+  await page.goto("/");
+  await expect(page.getByRole("button", { name: "设置目标分数" })).toContainText("7.5");
+  await page.getByRole("button", { name: "设置目标分数" }).click();
+  await expect(page.getByRole("dialog")).toBeVisible();
+
+  const downloadPromise = page.waitForEvent("download");
+  await page.getByRole("button", { name: "导出备份", exact: true }).click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toMatch(/^ielts-coach-backup-\d{4}-\d{2}-\d{2}\.json$/);
+  const filePath = await download.path();
+  if (!filePath) throw new Error("Backup download path is missing");
+  const exported = JSON.parse(await readFile(filePath, "utf8")) as SavedData;
+  expect(exported).toEqual(state);
+  expect(writes).toEqual([]);
 });
 
 test("editing a loaded profile retains existing records and does not save on load", async ({ page }) => {

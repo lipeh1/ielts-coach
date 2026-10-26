@@ -12,6 +12,7 @@ import {
   CheckCheck,
   CircleHelp,
   Clock3,
+  Download,
   FileText,
   Flame,
   Headphones,
@@ -549,6 +550,21 @@ export default function Home() {
     setSettingsOpen(true);
   }
 
+  function exportStudyData() {
+    if (!hydrated) return;
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `ielts-coach-backup-${localDateKey()}.json`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1_000);
+    setSettingsOpen(false);
+    setNotice("学习数据备份已导出。");
+  }
+
   const title = navItems.find((item) => item.id === view)?.label || "今日计划";
 
   return (
@@ -753,7 +769,7 @@ export default function Home() {
         </div>
       </main>
 
-      {settingsOpen && <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setSettingsOpen(false); }}><section className="settings-modal" role="dialog" aria-modal="true" aria-labelledby="settings-title"><div className="modal-heading"><div><div className="eyebrow">备考设置</div><h2 id="settings-title">你的目标</h2></div><button className="icon-button modal-close" onClick={() => setSettingsOpen(false)} aria-label="关闭"><X size={18} /></button></div><form onSubmit={saveGoal} className="goal-form"><label>目标总分<select value={goalDraft.targetBand} onChange={(event) => setGoalDraft({ ...goalDraft, targetBand: event.target.value })}>{["5.0", "5.5", "6.0", "6.5", "7.0", "7.5", "8.0", "8.5", "9.0"].map((score) => <option key={score}>{score}</option>)}</select></label><label>考试日期<input type="date" value={goalDraft.examDate} onChange={(event) => setGoalDraft({ ...goalDraft, examDate: event.target.value })} /></label><fieldset><legend>每日学习目标</legend><div className="duration-options">{[15, 30, 45, 60, 90].map((minutes) => <button type="button" className={goalDraft.dailyTarget === minutes ? "selected" : ""} key={minutes} onClick={() => setGoalDraft({ ...goalDraft, dailyTarget: minutes })}>{minutes}<small>分</small></button>)}</div></fieldset><div className="modal-actions"><AppButton variant="secondary" onClick={() => setSettingsOpen(false)}>取消</AppButton><AppButton type="submit" variant="primary" icon={Check} disabled={!hydrated}>保存目标</AppButton></div></form></section></div>}
+      {settingsOpen && <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setSettingsOpen(false); }}><section className="settings-modal" role="dialog" aria-modal="true" aria-labelledby="settings-title"><div className="modal-heading"><div><div className="eyebrow">备考设置</div><h2 id="settings-title">你的目标</h2></div><button className="icon-button modal-close" onClick={() => setSettingsOpen(false)} aria-label="关闭"><X size={18} /></button></div><form onSubmit={saveGoal} className="goal-form"><label>目标总分<select value={goalDraft.targetBand} onChange={(event) => setGoalDraft({ ...goalDraft, targetBand: event.target.value })}>{["5.0", "5.5", "6.0", "6.5", "7.0", "7.5", "8.0", "8.5", "9.0"].map((score) => <option key={score}>{score}</option>)}</select></label><label>考试日期<input type="date" value={goalDraft.examDate} onChange={(event) => setGoalDraft({ ...goalDraft, examDate: event.target.value })} /></label><fieldset><legend>每日学习目标</legend><div className="duration-options">{[15, 30, 45, 60, 90].map((minutes) => <button type="button" className={goalDraft.dailyTarget === minutes ? "selected" : ""} key={minutes} onClick={() => setGoalDraft({ ...goalDraft, dailyTarget: minutes })}>{minutes}<small>分</small></button>)}</div></fieldset><div className="modal-actions"><AppButton variant="secondary" onClick={() => setSettingsOpen(false)}>取消</AppButton><AppButton type="submit" variant="primary" icon={Check} disabled={!hydrated}>保存目标</AppButton></div></form><div className="backup-section"><div><strong>学习数据备份</strong><p>导出当前学习记录；恢复时替换 data/study-state.json。不包含录音和 API key。</p></div><AppButton variant="secondary" icon={Download} onClick={exportStudyData} disabled={!hydrated}>导出备份</AppButton></div></section></div>}
       {!hydrated && !loadError && <div className="loading-indicator" aria-label="正在载入学习记录" />}
     </div>
   );

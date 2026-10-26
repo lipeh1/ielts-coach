@@ -478,6 +478,11 @@ button:disabled { cursor: not-allowed; opacity: .52; }
 .duration-options button small { font-size: 9px; }
 .duration-options button.selected { border-color: var(--accent); background: var(--accent-subtle); color: #164f91; font-weight: 600; }
 .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; padding-top: 15px; border-top: 1px solid var(--border); }
+.backup-section { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--border); }
+.backup-section strong { display: block; font-size: 11px; font-weight: 600; }
+.backup-section p { margin: 4px 0 0; color: var(--text-tertiary); font-size: 10px; line-height: 1.5; }
+.backup-section .button { flex: 0 0 auto; }
+@media (max-width: 480px) { .backup-section { flex-direction: column; } .backup-section .button { width: 100%; justify-content: center; } }
 .loading-indicator { position: fixed; right: 14px; bottom: 14px; width: 8px; height: 8px; border-radius: 50%; background: #93b9e9; }
 
 @media (min-width: 1500px) {
