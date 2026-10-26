@@ -1,5 +1,7 @@
 # steady · IELTS study
 
+[![CI](https://github.com/lipeh1/ielts-coach/actions/workflows/ci.yml/badge.svg)](https://github.com/lipeh1/ielts-coach/actions/workflows/ci.yml)
+
 适合在职备考的雅思全流程学习工作台。当前包括目标设置、每日计划、听说读写练习、错题复练、AI 写作批改和学习记录。
 
 ## 本地启动
