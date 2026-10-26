@@ -5,6 +5,7 @@ import {
   ArrowLeft,
   ArrowRight,
   AudioLines,
+  BookMarked,
   BookOpen,
   CalendarDays,
   Check,
@@ -30,6 +31,7 @@ import {
   X,
 } from "lucide-react";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { VocabularyView } from "@/components/vocabulary-view";
 import type { FeedbackCriterion, FeedbackReport } from "@/lib/feedback";
 import { gradeListeningSection, type ListeningCompletionQuestion, type ListeningMultipleChoiceQuestion, type ListeningQuestionResult, type ListeningResult, type ListeningSection } from "@/lib/listening";
 import { listeningSection } from "@/lib/listening-data";
@@ -38,10 +40,12 @@ import { getDailyTask2Question } from "@/lib/questions-data";
 import { task2TypeLabels } from "@/lib/questions";
 import { gradeReadingPassage, type ReadingCompletionQuestion, type ReadingHeadingQuestion, type ReadingPassage, type ReadingQuestionResult, type ReadingResult, type ReadingTfngQuestion } from "@/lib/reading";
 import { readingPassage } from "@/lib/reading-data";
-import { defaultData, isValidState, type FeedbackHistoryEntry, type Mistake, type Profile, type SavedData, type Skill, type StudyLog } from "@/lib/study-data";
+import { defaultData, isValidState, type FeedbackHistoryEntry, type Mistake, type Profile, type SavedData, type Skill, type StudyLog, type VocabularyReviewSource } from "@/lib/study-data";
+import type { VocabularyWord } from "@/lib/vocabulary";
+import { createVocabularyReview, dueVocabularyReviews, scheduleVocabularyReview, type ReviewRating } from "@/lib/vocabulary-review";
 import { diffWords } from "@/lib/word-diff";
 
-type View = "today" | "practice" | "review" | "feedback" | "progress";
+type View = "today" | "practice" | "review" | "vocabulary" | "feedback" | "progress";
 
 const feedbackBandKeys = [
   { key: "TR", label: "任务回应", color: "#2f7cf6" },
@@ -61,6 +65,7 @@ const navItems: { id: View; label: string; icon: typeof BookOpen }[] = [
   { id: "today", label: "今日计划", icon: CalendarDays },
   { id: "practice", label: "练习中心", icon: ListChecks },
   { id: "review", label: "错题复练", icon: RotateCcw },
+  { id: "vocabulary", label: "词汇", icon: BookMarked },
   { id: "feedback", label: "AI 批改", icon: Sparkles },
   { id: "progress", label: "学习进度", icon: TrendingUp },
 ];
@@ -105,7 +110,7 @@ function getStreak(checkIns: string[]) {
   return count;
 }
 
-function Sidebar({ view, onNavigate, openSettings, pendingReviews }: { view: View; onNavigate: (view: View) => void; openSettings: () => void; pendingReviews: number }) {
+function Sidebar({ view, onNavigate, openSettings, pendingReviews, pendingVocabulary }: { view: View; onNavigate: (view: View) => void; openSettings: () => void; pendingReviews: number; pendingVocabulary: number }) {
   return (
     <>
       <aside className="sidebar">
@@ -120,6 +125,7 @@ function Sidebar({ view, onNavigate, openSettings, pendingReviews }: { view: Vie
               <Icon size={18} strokeWidth={1.8} />
               <span>{label}</span>
               {id === "review" && pendingReviews > 0 && <span className="nav-count">{pendingReviews}</span>}
+              {id === "vocabulary" && pendingVocabulary > 0 && <span className="nav-count">{pendingVocabulary}</span>}
             </button>
           ))}
         </nav>
@@ -140,6 +146,7 @@ function Sidebar({ view, onNavigate, openSettings, pendingReviews }: { view: Vie
           <button key={id} className={view === id ? "active" : ""} onClick={() => onNavigate(id)} aria-label={label}>
             <Icon size={20} strokeWidth={1.9} /><span>{label}</span>
             {id === "review" && pendingReviews > 0 && <i />}
+            {id === "vocabulary" && pendingVocabulary > 0 && <i />}
           </button>
         ))}
       </nav>
@@ -243,6 +250,7 @@ export default function Home() {
   const todayDone = todayLogs.length;
   const pendingMistakes = data.mistakes.filter((item) => !item.mastered);
   const feedbackHistory = data.feedbackHistory ?? [];
+  const dueVocabularyCount = dueVocabularyReviews(data.vocabularyReviews ?? [], todayKey).length;
   const weekDays = useMemo(() => Array.from({ length: 7 }, (_, index) => {
     const date = new Date();
     date.setDate(date.getDate() - (6 - index));
@@ -358,6 +366,29 @@ export default function Home() {
     setData((current) => ({ ...current, mistakes: current.mistakes.map((item) => item.id === id ? { ...item, mastered: true } : item) }));
   }
 
+  function addVocabularyReview(word: VocabularyWord, source: VocabularyReviewSource) {
+    if (!hydrated) return;
+    const today = localDateKey();
+    setData((current) => {
+      const reviews = current.vocabularyReviews ?? [];
+      if (reviews.some((entry) => entry.id === word.id)) return current;
+      return { ...current, vocabularyReviews: [createVocabularyReview(word.id, word.w, source, today), ...reviews] };
+    });
+  }
+
+  function reviewVocabulary(id: string, rating: ReviewRating) {
+    if (!hydrated) return;
+    const today = localDateKey();
+    setData((current) => {
+      const reviews = current.vocabularyReviews ?? [];
+      return {
+        ...current,
+        vocabularyReviews: reviews.map((entry) => entry.id === id ? scheduleVocabularyReview(entry, rating, today) : entry),
+        checkIns: current.checkIns.includes(today) ? current.checkIns : [...current.checkIns, today],
+      };
+    });
+  }
+
   async function submitEssay(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!hydrated) return;
@@ -438,7 +469,7 @@ export default function Home() {
         writingStartedAtRef.current = next === "feedback" ? Date.now() : null;
         setView(next);
         setActiveSkill(null);
-      }} openSettings={openGoalSettings} pendingReviews={pendingMistakes.length} />
+      }} openSettings={openGoalSettings} pendingReviews={pendingMistakes.length} pendingVocabulary={dueVocabularyCount} />
       <main className="main-area">
         <header className="topbar">
           <div className="breadcrumbs"><span>我的学习</span><span className="crumb-divider">/</span><strong>{title}</strong></div>
@@ -600,6 +631,8 @@ export default function Home() {
               <div className="report-next-step"><Lightbulb size={17} /><div><strong>下一次练习</strong><p>{feedback.nextStep}</p></div></div>
             </section>}
           </>}
+
+          {view === "vocabulary" && <VocabularyView today={todayKey} reviews={data.vocabularyReviews ?? []} hydrated={hydrated} onAddReview={addVocabularyReview} onReview={reviewVocabulary} />}
 
           {view === "progress" && <>
             <div className="page-title-row"><div><div className="eyebrow">记录与趋势</div><h1>学习进度</h1><p>回看练习时长、打卡和各科练习分布。</p></div><button className="goal-chip" onClick={openGoalSettings}><Target size={15} />目标 {data.profile.targetBand}</button></div>

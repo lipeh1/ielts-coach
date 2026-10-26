@@ -16,6 +16,7 @@ function populatedData() {
     mistakes: [{ id: "mistake-1", skill: "reading", question: "True or false?", reason: "Find the evidence.", date: "2026-10-11", mastered: false }],
     checkIns: ["2026-10-12"],
     feedbackHistory: [{ id: "writing-1", date: "2026-10-12", overall: 6.5, bands: { TR: 6, CC: 7, LR: 6, GRA: 7 } }],
+    vocabularyReviews: [{ id: "motivate", word: "motivate", source: "manual", interval: 1, ease: 2.5, repetitions: 1, due: "2026-10-13", lastReviewed: "2026-10-12" }],
   };
 }
 
@@ -29,15 +30,37 @@ test("default data returns independent objects and lists", () => {
   first.profile.targetBand = "9.0";
   first.checkIns.push("2026-10-12");
   first.feedbackHistory.push({ id: "writing-1", date: "2026-10-12", overall: 6.5, bands: { TR: 6, CC: 7, LR: 6, GRA: 7 } });
+  first.vocabularyReviews.push({ id: "motivate", word: "motivate", source: "manual", interval: 0, ease: 2.5, repetitions: 0, due: "2026-10-12", lastReviewed: null });
   assert.equal(defaultData().profile.targetBand, "7.0");
   assert.deepEqual(defaultData().checkIns, []);
   assert.deepEqual(defaultData().feedbackHistory, []);
+  assert.deepEqual(defaultData().vocabularyReviews, []);
 });
 
-test("accepts legacy state without feedback history", () => {
+test("accepts legacy state without feedback history or vocabulary reviews", () => {
   const legacy = populatedData();
   delete legacy.feedbackHistory;
+  delete legacy.vocabularyReviews;
   assert.equal(isValidState(legacy), true);
+});
+
+test("rejects malformed vocabulary review entries", () => {
+  for (const vocabularyReviews of [
+    {},
+    [null],
+    [{ id: 1, word: "motivate", source: "manual", interval: 0, ease: 2.5, repetitions: 0, due: "2026-10-12", lastReviewed: null }],
+    [{ id: "motivate", word: "", source: "manual", interval: 0, ease: 2.5, repetitions: 0, due: "2026-10-12", lastReviewed: null }],
+    [{ id: "motivate", word: "motivate", source: "unknown", interval: 0, ease: 2.5, repetitions: 0, due: "2026-10-12", lastReviewed: null }],
+    [{ id: "motivate", word: "motivate", source: "manual", interval: -1, ease: 2.5, repetitions: 0, due: "2026-10-12", lastReviewed: null }],
+    [{ id: "motivate", word: "motivate", source: "manual", interval: 0, ease: 1.2, repetitions: 0, due: "2026-10-12", lastReviewed: null }],
+    [{ id: "motivate", word: "motivate", source: "manual", interval: 0, ease: 2.5, repetitions: "0", due: "2026-10-12", lastReviewed: null }],
+    [{ id: "motivate", word: "motivate", source: "manual", interval: 0, ease: 2.5, repetitions: 0, due: "2026/10/12", lastReviewed: null }],
+    [{ id: "motivate", word: "motivate", source: "manual", interval: 0, ease: 2.5, repetitions: 0, due: "2026-10-12", lastReviewed: "yesterday" }],
+  ]) {
+    const value = populatedData();
+    value.vocabularyReviews = vocabularyReviews;
+    assert.equal(isValidState(value), false, JSON.stringify(vocabularyReviews));
+  }
 });
 
 test("rejects malformed feedback history entries", () => {

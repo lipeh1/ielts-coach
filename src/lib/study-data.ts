@@ -4,10 +4,29 @@ export type StudyLog = { id: string; date: string; minutes: number; skill: Skill
 export type Mistake = { id: string; skill: Skill; question: string; reason: string; date: string; mastered: boolean };
 export type FeedbackBandRecord = { TR: number; CC: number; LR: number; GRA: number };
 export type FeedbackHistoryEntry = { id: string; date: string; overall: number; bands: FeedbackBandRecord };
-export type SavedData = { profile: Profile; logs: StudyLog[]; mistakes: Mistake[]; checkIns: string[]; feedbackHistory?: FeedbackHistoryEntry[] };
+export type VocabularyReviewSource = "manual" | "writing" | "listening" | "reading";
+export type VocabularyReview = {
+  id: string;
+  word: string;
+  source: VocabularyReviewSource;
+  interval: number;
+  ease: number;
+  repetitions: number;
+  due: string;
+  lastReviewed: string | null;
+};
+export type SavedData = {
+  profile: Profile;
+  logs: StudyLog[];
+  mistakes: Mistake[];
+  checkIns: string[];
+  feedbackHistory?: FeedbackHistoryEntry[];
+  vocabularyReviews?: VocabularyReview[];
+};
 
 const skills = new Set(["listening", "reading", "writing", "speaking"]);
 const bands = new Set(["5.0", "5.5", "6.0", "6.5", "7.0", "7.5", "8.0", "8.5", "9.0"]);
+const reviewSources = new Set(["manual", "writing", "listening", "reading"]);
 
 export function defaultData(): SavedData {
   return {
@@ -16,6 +35,7 @@ export function defaultData(): SavedData {
     mistakes: [],
     checkIns: [],
     feedbackHistory: [],
+    vocabularyReviews: [],
   };
 }
 
@@ -37,6 +57,23 @@ function isFeedbackHistoryEntry(value: unknown): value is FeedbackHistoryEntry {
     const score = bandRecord[key];
     return isBandScore(score) && Number.isInteger(score);
   });
+}
+
+function isNonNegativeNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0;
+}
+
+function isVocabularyReview(value: unknown): value is VocabularyReview {
+  if (!value || typeof value !== "object") return false;
+  const review = value as Record<string, unknown>;
+  return typeof review.id === "string" && review.id.length > 0
+    && typeof review.word === "string" && review.word.length > 0
+    && typeof review.source === "string" && reviewSources.has(review.source)
+    && isNonNegativeNumber(review.interval)
+    && isNonNegativeNumber(review.ease) && review.ease >= 1.3
+    && isNonNegativeNumber(review.repetitions)
+    && isDateKey(review.due)
+    && (review.lastReviewed === null || isDateKey(review.lastReviewed));
 }
 
 export function isValidState(value: unknown): value is SavedData {
@@ -61,5 +98,7 @@ export function isValidState(value: unknown): value is SavedData {
   })) return false;
   if (state.feedbackHistory !== undefined
     && (!Array.isArray(state.feedbackHistory) || state.feedbackHistory.some((entry) => !isFeedbackHistoryEntry(entry)))) return false;
+  if (state.vocabularyReviews !== undefined
+    && (!Array.isArray(state.vocabularyReviews) || state.vocabularyReviews.some((entry) => !isVocabularyReview(entry)))) return false;
   return state.checkIns.every(isDateKey);
 }

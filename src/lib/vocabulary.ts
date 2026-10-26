@@ -8,6 +8,28 @@ export const vocabularyTopics = [
 ] as const;
 export type VocabularyTopic = (typeof vocabularyTopics)[number];
 
+export const vocabularyTopicLabels: Record<VocabularyTopic, string> = {
+  education: "教育",
+  work: "职场",
+  technology: "科技",
+  science: "科学",
+  environment: "环境",
+  health: "健康",
+  society: "社会",
+  government: "政法",
+  economy: "经济",
+  media: "媒体",
+  arts: "艺术",
+  travel: "旅行",
+  city: "城市",
+  nature: "自然",
+  daily: "生活",
+  emotion: "情感",
+  thinking: "思维",
+  sport: "运动",
+  history: "历史",
+};
+
 export type VocabularySense = { pos: string; zh: string; en: string };
 export type VocabularyExample = { en: string; zh: string };
 export type VocabularyWord = {
