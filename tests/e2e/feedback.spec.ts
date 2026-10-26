@@ -84,6 +84,7 @@ test("writing feedback shows the server report and records a low-band mistake on
   await expect(page.locator(".polish-rewrite ins").first()).toBeVisible();
   await expect(page.locator(".polish-rewrite del").first()).toBeVisible();
   await expect.poll(() => writes.at(-1)?.mistakes.length).toBe(0);
+  await expect.poll(() => writes.at(-1)?.feedbackHistory?.length).toBe(1);
 
   await page.getByRole("button", { name: /错题复练/ }).first().click();
   await expect(page.getByRole("heading", { name: "暂时没有待复习错题" })).toBeVisible();
@@ -91,6 +92,7 @@ test("writing feedback shows the server report and records a low-band mistake on
   const lowEssay = `${essay} LOW_BAND`;
   await submit(page, lowEssay);
   await expect.poll(() => writes.at(-1)?.mistakes.length).toBe(1);
+  await expect.poll(() => writes.at(-1)?.feedbackHistory?.length).toBe(2);
 
   await page.getByRole("button", { name: /错题复练/ }).first().click();
   await expect(page.getByRole("heading", { name: "Writing Task 2 · TR · 任务回应" })).toBeVisible();
@@ -98,9 +100,15 @@ test("writing feedback shows the server report and records a low-band mistake on
   await submit(page, lowEssay);
   await expect.poll(() => writes.at(-1)?.logs.length).toBe(3);
   expect(writes.at(-1)?.mistakes.length).toBe(1);
+  expect(writes.at(-1)?.feedbackHistory?.length).toBe(2);
   await page.getByRole("button", { name: /错题复练/ }).first().click();
   await expect(page.getByRole("heading", { name: "Writing Task 2 · TR · 任务回应" })).toHaveCount(1);
 
   await submit(page, `${essay} FAKE_EVIDENCE`);
   await expect(page.getByText("本项未找到可核验原文")).toBeVisible();
+  await expect.poll(() => writes.at(-1)?.feedbackHistory?.length).toBe(3);
+
+  await page.getByRole("button", { name: "学习进度", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "四项评分变化" })).toBeVisible();
+  await expect(page.locator(".feedback-trend")).toHaveCount(4);
 });

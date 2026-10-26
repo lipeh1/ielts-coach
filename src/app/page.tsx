@@ -30,12 +30,19 @@ import {
 } from "lucide-react";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import type { FeedbackCriterion, FeedbackReport } from "@/lib/feedback";
-import { defaultData, isValidState, type Profile, type SavedData, type Skill, type StudyLog } from "@/lib/study-data";
+import { defaultData, isValidState, type FeedbackHistoryEntry, type Mistake, type Profile, type SavedData, type Skill, type StudyLog } from "@/lib/study-data";
 import { diffWords } from "@/lib/word-diff";
 
 type View = "today" | "practice" | "review" | "feedback" | "progress";
 
 const writingTaskPrompt = "Some people believe that employees should be given the right to work from home. Others think that working in an office is more effective. Discuss both views and give your own opinion.";
+
+const feedbackBandKeys = [
+  { key: "TR", label: "任务回应", color: "#2f7cf6" },
+  { key: "CC", label: "连贯与衔接", color: "#237a45" },
+  { key: "LR", label: "词汇资源", color: "#8a5a00" },
+  { key: "GRA", label: "语法多样性", color: "#6b4fa1" },
+] as const;
 
 const skills: { id: Skill; name: string; en: string; icon: typeof BookOpen; tint: string; minutes: number }[] = [
   { id: "listening", name: "听力", en: "Listening", icon: Headphones, tint: "blue", minutes: 12 },
@@ -222,6 +229,7 @@ export default function Home() {
   const todayMinutes = todayLogs.reduce((sum, log) => sum + log.minutes, 0);
   const todayDone = todayLogs.length;
   const pendingMistakes = data.mistakes.filter((item) => !item.mastered);
+  const feedbackHistory = data.feedbackHistory ?? [];
   const weekDays = useMemo(() => Array.from({ length: 7 }, (_, index) => {
     const date = new Date();
     date.setDate(date.getDate() - (6 - index));
@@ -299,20 +307,35 @@ export default function Home() {
         (lowest, criterion) => !lowest || criterion.band < lowest.band ? criterion : lowest,
         null,
       );
-      if (weakest && weakest.band <= 5.5) {
+      const mistake: Mistake | null = weakest && weakest.band <= 5.5 ? {
+        id: result.submissionId,
+        skill: "writing",
+        question: `Writing Task 2 · ${weakest.name}`,
+        reason: weakest.suggestion,
+        date: localDateKey(),
+        mastered: false,
+      } : null;
+      const historyEntry: FeedbackHistoryEntry | null = result.demo ? null : {
+        id: result.submissionId,
+        date: localDateKey(),
+        overall: result.overallBand,
+        bands: {
+          TR: result.criteria[0].band,
+          CC: result.criteria[1].band,
+          LR: result.criteria[2].band,
+          GRA: result.criteria[3].band,
+        },
+      };
+      if (mistake || historyEntry) {
         setData((current) => {
-          if (current.mistakes.some((item) => item.id === result.submissionId)) return current;
-          return {
-            ...current,
-            mistakes: [{
-              id: result.submissionId,
-              skill: "writing",
-              question: `Writing Task 2 · ${weakest.name}`,
-              reason: weakest.suggestion,
-              date: localDateKey(),
-              mastered: false,
-            }, ...current.mistakes],
-          };
+          let next = current;
+          if (historyEntry && !(current.feedbackHistory ?? []).some((entry) => entry.id === historyEntry.id)) {
+            next = { ...next, feedbackHistory: [...(current.feedbackHistory ?? []), historyEntry] };
+          }
+          if (mistake && !next.mistakes.some((item) => item.id === mistake.id)) {
+            next = { ...next, mistakes: [mistake, ...next.mistakes] };
+          }
+          return next;
         });
       }
     } catch (error) {
@@ -517,6 +540,27 @@ export default function Home() {
             <div className="stat-grid"><div className="stat-item"><span>本周练习</span><strong>{totalWeekMinutes}<small>分钟</small></strong><p>近 7 天累计学习时长</p></div><div className="stat-item"><span>完成练习</span><strong>{data.logs.length}<small>项</small></strong><p>听说读写练习记录</p></div><div className="stat-item"><span>连续打卡</span><strong>{streak}<small>天</small></strong><p>每天完成一项练习即可记录</p></div><div className="stat-item"><span>待复习错题</span><strong>{pendingMistakes.length}<small>道</small></strong><p>完成后可标记为已掌握</p></div></div>
             <div className="progress-layout"><section className="chart-section"><SectionHeading eyebrow="每日记录" title="近 7 天学习时长" description="按完成练习的预计时长统计。" /><div className="week-chart" role="img" aria-label="近七天学习分钟数柱状图">{weekDays.map((day) => <div className="chart-day" key={day.key}><strong>{day.minutes > 0 ? `${day.minutes}m` : ""}</strong><div className="chart-bar-track"><i style={{ height: `${day.minutes ? Math.max(8, (day.minutes / maxWeekMinutes) * 100) : 0}%` }} /></div><span>{day.label}</span></div>)}</div><div className="chart-footer"><span><i />每日学习时长</span><span>合计 {totalWeekMinutes} 分钟</span></div></section>
               <section className="distribution-section"><SectionHeading eyebrow="均衡练习" title="四科练习分布" /><div className="distribution-list">{skills.map(({ id, name, icon: Icon, tint }) => { const count = data.logs.filter((log) => log.skill === id).length; const pct = data.logs.length ? Math.round(count / data.logs.length * 100) : 0; return <div className="distribution-row" key={id}><span className={`distribution-icon ${tint}`}><Icon size={16} /></span><div className="distribution-detail"><div><strong>{name}</strong><span>{count} 次 · {pct}%</span></div><i><b style={{ width: `${pct}%` }} /></i></div></div>; })}</div></section></div>
+            <section className="section-block feedback-history-section">
+              <SectionHeading eyebrow="写作趋势" title="四项评分变化" description="仅记录真实 AI 批改；重复提交同一篇不会重复计点。" />
+              {feedbackHistory.length ? <div className="feedback-trends">
+                {feedbackBandKeys.map(({ key, label, color }) => {
+                  const points = feedbackHistory.slice(-12).map((entry) => entry.bands[key]);
+                  const latest = points.at(-1);
+                  const coordinates = points.map((value, index) => ({
+                    x: points.length === 1 ? 60 : 4 + (index / (points.length - 1)) * 112,
+                    y: 38 - (value / 9) * 36,
+                  }));
+                  return <article className="feedback-trend" key={key}>
+                    <div className="feedback-trend-head"><span>{key}</span><strong>{latest?.toFixed(1)}</strong></div>
+                    <svg viewBox="0 0 120 40" role="img" aria-label={`${label} 最近 ${points.length} 次评分`}>
+                      <polyline points={coordinates.map(({ x, y }) => `${x},${y}`).join(" ")} fill="none" stroke={color} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
+                      {coordinates.map(({ x, y }, index) => <circle key={index} cx={x} cy={y} r="2" fill={color} />)}
+                    </svg>
+                    <span className="feedback-trend-label">{label} · 最近 {points.length} 次</span>
+                  </article>;
+                })}
+              </div> : <div className="history-empty"><p>提交一篇真实 AI 批改后，这里会显示四项分数变化。</p></div>}
+            </section>
             <section className="section-block history-section"><SectionHeading eyebrow="近期活动" title="练习记录" />{data.logs.length ? <div className="history-list">{[...data.logs].reverse().slice(0, 8).map((log) => <div className="history-row" key={log.id}><span className={`history-dot ${skills.find((item) => item.id === log.skill)?.tint}`} /><div><strong>{skillNames[log.skill]}练习</strong><small>{log.date} · {log.total ? `${log.correct}/${log.total} 题正确` : "练习已完成"}</small></div><span>{log.minutes} 分钟</span></div>)}</div> : <div className="history-empty"><p>完成第一项练习后，学习记录会显示在这里。</p><AppButton variant="secondary" icon={ArrowRight} onClick={() => setView("practice")}>开始练习</AppButton></div>}</section>
           </>}
         </div>

@@ -15,6 +15,7 @@ function populatedData() {
     logs: [{ id: "log-1", date: "2026-10-12", minutes: 10, skill: "listening", correct: 1, total: 1 }],
     mistakes: [{ id: "mistake-1", skill: "reading", question: "True or false?", reason: "Find the evidence.", date: "2026-10-11", mastered: false }],
     checkIns: ["2026-10-12"],
+    feedbackHistory: [{ id: "writing-1", date: "2026-10-12", overall: 6.5, bands: { TR: 6, CC: 7, LR: 6, GRA: 7 } }],
   };
 }
 
@@ -27,8 +28,34 @@ test("default data returns independent objects and lists", () => {
   const first = defaultData();
   first.profile.targetBand = "9.0";
   first.checkIns.push("2026-10-12");
+  first.feedbackHistory.push({ id: "writing-1", date: "2026-10-12", overall: 6.5, bands: { TR: 6, CC: 7, LR: 6, GRA: 7 } });
   assert.equal(defaultData().profile.targetBand, "7.0");
   assert.deepEqual(defaultData().checkIns, []);
+  assert.deepEqual(defaultData().feedbackHistory, []);
+});
+
+test("accepts legacy state without feedback history", () => {
+  const legacy = populatedData();
+  delete legacy.feedbackHistory;
+  assert.equal(isValidState(legacy), true);
+});
+
+test("rejects malformed feedback history entries", () => {
+  for (const feedbackHistory of [
+    {},
+    [null],
+    [{ id: 1, date: "2026-10-12", overall: 6.5, bands: { TR: 6, CC: 7, LR: 6, GRA: 7 } }],
+    [{ id: "writing-1", date: "2026/10/12", overall: 6.5, bands: { TR: 6, CC: 7, LR: 6, GRA: 7 } }],
+    [{ id: "writing-1", date: "2026-10-12", overall: "6.5", bands: { TR: 6, CC: 7, LR: 6, GRA: 7 } }],
+    [{ id: "writing-1", date: "2026-10-12", overall: 6.5 }],
+    [{ id: "writing-1", date: "2026-10-12", overall: 6.5, bands: { TR: 6, CC: 7, LR: 6 } }],
+    [{ id: "writing-1", date: "2026-10-12", overall: 6.5, bands: { TR: 6.5, CC: 7, LR: 6, GRA: 7 } }],
+    [{ id: "writing-1", date: "2026-10-12", overall: 6.5, bands: { TR: 10, CC: 7, LR: 6, GRA: 7 } }],
+  ]) {
+    const value = populatedData();
+    value.feedbackHistory = feedbackHistory;
+    assert.equal(isValidState(value), false, JSON.stringify(feedbackHistory));
+  }
 });
 
 test("rejects absent state, partial objects and missing collections", () => {

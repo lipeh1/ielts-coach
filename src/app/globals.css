@@ -348,6 +348,13 @@ button:disabled { cursor: not-allowed; opacity: .52; }
 .polish-rewrite del { color: var(--text-tertiary); text-decoration: line-through; }
 .polish-translation { display: grid; gap: 4px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); color: var(--text-secondary); font-size: 11px; line-height: 1.7; }
 .polish-translation span { color: var(--text-tertiary); font-size: 9px; font-weight: 650; }
+.feedback-trends { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 14px; }
+.feedback-trend { padding: 12px 14px; border: 1px solid var(--border); border-radius: 7px; background: var(--surface); }
+.feedback-trend-head { display: flex; align-items: baseline; justify-content: space-between; color: var(--text-secondary); font-size: 10px; font-weight: 600; }
+.feedback-trend-head strong { color: var(--text); font-size: 16px; font-weight: 620; font-variant-numeric: tabular-nums; }
+.feedback-trend svg { display: block; width: 100%; height: 40px; margin-top: 8px; overflow: visible; }
+.feedback-trend-label { display: block; margin-top: 4px; color: var(--text-tertiary); font-size: 9px; }
+@media (max-width: 720px) { .feedback-trends { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .report-next-step { display: flex; align-items: flex-start; gap: 9px; margin-top: 12px; padding: 12px; border: 1px solid #cbdcf5; border-radius: 7px; background: var(--accent-subtle); color: #164f91; }
 .report-next-step > svg { flex: 0 0 auto; margin-top: 1px; }
 .report-next-step strong { font-size: 11px; }
