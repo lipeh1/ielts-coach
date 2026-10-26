@@ -60,6 +60,7 @@ const skills: { id: Skill; name: string; en: string; icon: typeof BookOpen; tint
   { id: "reading", name: "阅读", en: "Reading", icon: BookOpen, tint: "green", minutes: readingPassage.minutes },
   { id: "writing", name: "写作", en: "Writing", icon: PencilLine, tint: "orange", minutes: 20 },
   { id: "speaking", name: "口语", en: "Speaking", icon: Mic2, tint: "violet", minutes: 10 },
+  { id: "vocabulary", name: "词汇", en: "Vocabulary", icon: BookMarked, tint: "teal", minutes: 20 },
 ];
 
 const navItems: { id: View; label: string; icon: typeof BookOpen }[] = [
@@ -76,6 +77,7 @@ const skillNames: Record<Skill, string> = {
   reading: "阅读",
   writing: "写作",
   speaking: "口语",
+  vocabulary: "词汇",
 };
 
 function localDateKey(date = new Date()) {
@@ -272,6 +274,11 @@ export default function Home() {
     if (!hydrated) return;
     setAnswer("");
     setSessionResult(null);
+    if (skill === "vocabulary") {
+      setActiveSkill(null);
+      setView("vocabulary");
+      return;
+    }
     if (skill === "writing") {
       writingStartedAtRef.current = Date.now();
       setActiveSkill(null);
@@ -387,14 +394,16 @@ export default function Home() {
     });
   }
 
-  function reviewVocabulary(id: string, rating: ReviewRating) {
+  function reviewVocabulary(id: string, rating: ReviewRating, minutes: number) {
     if (!hydrated) return;
     const today = localDateKey();
+    const log: StudyLog = { id: crypto.randomUUID(), date: today, minutes, skill: "vocabulary", correct: 0, total: 0 };
     setData((current) => {
       const reviews = current.vocabularyReviews ?? [];
       return {
         ...current,
         vocabularyReviews: reviews.map((entry) => entry.id === id ? scheduleVocabularyReview(entry, rating, today) : entry),
+        logs: [...current.logs, log],
         checkIns: current.checkIns.includes(today) ? current.checkIns : [...current.checkIns, today],
       };
     });
@@ -632,7 +641,7 @@ export default function Home() {
                 </section>
 
                 <section className="section-block skill-section">
-                  <SectionHeading eyebrow="四科练习" title="循序覆盖听说读写" action={<button className="text-action" onClick={() => setView("practice")}>练习中心 <ArrowRight size={15} /></button>} />
+                  <SectionHeading eyebrow="专项练习" title="按需覆盖各项能力" action={<button className="text-action" onClick={() => setView("practice")}>练习中心 <ArrowRight size={15} /></button>} />
                   <div className="skill-grid">
                     {skills.map(({ id, name, en, icon: Icon, tint, minutes }) => {
                       const count = data.logs.filter((log) => log.skill === id).length;
@@ -671,7 +680,7 @@ export default function Home() {
             {activeSkill === "reading" ? <ReadingSession passage={readingPassage} ready={hydrated} onSubmit={submitReading} onBack={() => setActiveSkill(null)} /> : activeSkill === "listening" ? <ListeningSession section={listeningSection} ready={hydrated} onSubmit={submitListening} onBack={() => setActiveSkill(null)} /> : activeSkill === "speaking" ? <SpeakingSession answer={answer} setAnswer={setAnswer} result={sessionResult} onSubmit={submitSession} onBack={() => { setActiveSkill(null); setSessionResult(null); }} /> : <>
               <div className="page-title-row"><div><div className="eyebrow">练习与模考</div><h1>练习中心</h1><p>按科目和可用时间选择一项，练习后查看解析。</p></div><span className="small-pill"><AlarmClock size={14} />按 10–20 分钟设计</span></div>
               <div className="practice-overview"><div className="practice-overview-main"><span className="eyebrow">适合工作日的节奏</span><h2>一段专注时间，完成一个小目标。</h2><p>练习会自动计入今日计划。答错的题目进入错题复习，并影响下一次推荐。</p></div><div className="practice-overview-side"><strong>{data.profile.dailyTarget}</strong><span>每日目标 · 分钟</span><button className="text-action" onClick={openGoalSettings}>调整 <ArrowRight size={14} /></button></div></div>
-              <section className="section-block practice-list-section"><SectionHeading eyebrow="选择科目" title="开始一项练习" /><div className="practice-cards">{skills.map(({ id, name, en, icon: Icon, tint, minutes }) => <article className="practice-card" key={id}><div className="practice-card-top"><span className={`skill-icon ${tint}`}><Icon size={20} /></span><span className="practice-count">{data.logs.filter((log) => log.skill === id).length} 次完成</span></div><h3>{name}<small>{en}</small></h3><p>{id === "listening" ? "场景对话、细节捕捉与同义表达辨认。" : id === "reading" ? "段落定位、题型策略与同义替换练习。" : id === "writing" ? "Task 1 / Task 2 写作，并获得四项标准反馈。" : "逐题作答、Part 2 个人陈述与表达复盘。"}</p><div className="practice-card-footer"><span><Clock3 size={14} />约 {minutes} 分钟</span><AppButton variant="secondary" icon={ArrowRight} onClick={() => startSkill(id)}>开始练习</AppButton></div></article>)}</div></section>
+              <section className="section-block practice-list-section"><SectionHeading eyebrow="选择科目" title="开始一项练习" /><div className="practice-cards">{skills.map(({ id, name, en, icon: Icon, tint, minutes }) => <article className="practice-card" key={id}><div className="practice-card-top"><span className={`skill-icon ${tint}`}><Icon size={20} /></span><span className="practice-count">{data.logs.filter((log) => log.skill === id).length} 次完成</span></div><h3>{name}<small>{en}</small></h3><p>{id === "listening" ? "场景对话、细节捕捉与同义表达辨认。" : id === "reading" ? "段落定位、题型策略与同义替换练习。" : id === "writing" ? "Task 1 / Task 2 写作，并获得四项标准反馈。" : id === "vocabulary" ? "复习到期单词，按间隔重复巩固词汇。" : "逐题作答、Part 2 个人陈述与表达复盘。"}</p><div className="practice-card-footer"><span><Clock3 size={14} />约 {minutes} 分钟</span><AppButton variant="secondary" icon={ArrowRight} onClick={() => startSkill(id)}>开始练习</AppButton></div></article>)}</div></section>
               <section className="section-block mock-section"><div className="mock-row"><div className="mock-icon"><FileText size={19} /></div><div><strong>完整模考</strong><p>将听力、阅读、写作组合为一次限时模考。建议在有完整时间时进行。</p></div><span className="coming-label">计划中</span></div></section>
             </>}
           </>}
@@ -740,9 +749,9 @@ export default function Home() {
 
           {view === "progress" && <>
             <div className="page-title-row"><div><div className="eyebrow">记录与趋势</div><h1>学习进度</h1><p>回看练习时长、打卡和各科练习分布。</p></div><button className="goal-chip" onClick={openGoalSettings}><Target size={15} />目标 {data.profile.targetBand}</button></div>
-            <div className="stat-grid"><div className="stat-item"><span>本周练习</span><strong>{totalWeekMinutes}<small>分钟</small></strong><p>近 7 天累计学习时长</p></div><div className="stat-item"><span>完成练习</span><strong>{data.logs.length}<small>项</small></strong><p>听说读写练习记录</p></div><div className="stat-item"><span>连续打卡</span><strong>{streak}<small>天</small></strong><p>每天完成一项练习即可记录</p></div><div className="stat-item"><span>待复习错题</span><strong>{pendingMistakes.length}<small>道</small></strong><p>完成后可标记为已掌握</p></div></div>
+            <div className="stat-grid"><div className="stat-item"><span>本周练习</span><strong>{totalWeekMinutes}<small>分钟</small></strong><p>近 7 天累计学习时长</p></div><div className="stat-item"><span>完成练习</span><strong>{data.logs.length}<small>项</small></strong><p>各科练习记录</p></div><div className="stat-item"><span>连续打卡</span><strong>{streak}<small>天</small></strong><p>每天完成一项练习即可记录</p></div><div className="stat-item"><span>待复习错题</span><strong>{pendingMistakes.length}<small>道</small></strong><p>完成后可标记为已掌握</p></div></div>
             <div className="progress-layout"><section className="chart-section"><SectionHeading eyebrow="每日记录" title="近 7 天学习时长" description="按完成练习的预计时长统计。" /><div className="week-chart" role="img" aria-label="近七天学习分钟数柱状图">{weekDays.map((day) => <div className="chart-day" key={day.key}><strong>{day.minutes > 0 ? `${day.minutes}m` : ""}</strong><div className="chart-bar-track"><i style={{ height: `${day.minutes ? Math.max(8, (day.minutes / maxWeekMinutes) * 100) : 0}%` }} /></div><span>{day.label}</span></div>)}</div><div className="chart-footer"><span><i />每日学习时长</span><span>合计 {totalWeekMinutes} 分钟</span></div></section>
-              <section className="distribution-section"><SectionHeading eyebrow="均衡练习" title="四科练习分布" /><div className="distribution-list">{skills.map(({ id, name, icon: Icon, tint }) => { const count = data.logs.filter((log) => log.skill === id).length; const pct = data.logs.length ? Math.round(count / data.logs.length * 100) : 0; return <div className="distribution-row" key={id}><span className={`distribution-icon ${tint}`}><Icon size={16} /></span><div className="distribution-detail"><div><strong>{name}</strong><span>{count} 次 · {pct}%</span></div><i><b style={{ width: `${pct}%` }} /></i></div></div>; })}</div></section></div>
+              <section className="distribution-section"><SectionHeading eyebrow="均衡练习" title="练习分布" /><div className="distribution-list">{skills.map(({ id, name, icon: Icon, tint }) => { const count = data.logs.filter((log) => log.skill === id).length; const pct = data.logs.length ? Math.round(count / data.logs.length * 100) : 0; return <div className="distribution-row" key={id}><span className={`distribution-icon ${tint}`}><Icon size={16} /></span><div className="distribution-detail"><div><strong>{name}</strong><span>{count} 次 · {pct}%</span></div><i><b style={{ width: `${pct}%` }} /></i></div></div>; })}</div></section></div>
             <section className="section-block feedback-history-section">
               <SectionHeading eyebrow="写作趋势" title="四项评分变化" description="仅记录真实 AI 批改；重复提交同一篇不会重复计点。" />
               {feedbackHistory.length ? <div className="feedback-trends">

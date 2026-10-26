@@ -134,6 +134,7 @@ button:disabled { cursor: not-allowed; opacity: .52; }
 .green { background: var(--green-soft); color: #237a45; }
 .orange { background: var(--orange-soft); color: #8a5a00; }
 .violet { background: var(--violet-soft); color: #675191; }
+.teal { background: #e7f2f1; color: #1f6f6a; }
 .plan-content { min-width: 0; flex: 1; }
 .plan-title-row { display: flex; align-items: center; gap: 8px; }
 .plan-content strong { display: block; font-size: 12px; font-weight: 600; }
@@ -455,6 +456,7 @@ button:disabled { cursor: not-allowed; opacity: .52; }
 .history-dot.green { background: #58a36e; }
 .history-dot.orange { background: #d99b31; }
 .history-dot.violet { background: #927ab9; }
+.history-dot.teal { background: #4f9c96; }
 .history-row > div { min-width: 0; flex: 1; }
 .history-row strong, .history-row small { display: block; }
 .history-row strong { font-size: 11px; font-weight: 600; }

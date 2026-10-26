@@ -26,6 +26,12 @@ test("accepts initial data and existing populated study records", () => {
   assert.equal(isValidState(populatedData()), true);
 });
 
+test("accepts vocabulary review logs", () => {
+  const value = populatedData();
+  value.logs.push({ id: "vocab-log", date: "2026-10-12", minutes: 2, skill: "vocabulary", correct: 0, total: 0 });
+  assert.equal(isValidState(value), true);
+});
+
 test("default data returns independent objects and lists", () => {
   const first = defaultData();
   first.profile.targetBand = "9.0";

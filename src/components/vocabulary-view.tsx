@@ -1,7 +1,8 @@
 "use client";
 
 import { ArrowLeft, ArrowRight, BookMarked, Check, Search } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { elapsedMinutes } from "@/lib/practice-time";
 import type { VocabularyReview, VocabularyReviewSource } from "@/lib/study-data";
 import type { VocabularyWord } from "@/lib/vocabulary";
 import { vocabularyTopicLabels, vocabularyTopics } from "@/lib/vocabulary";
@@ -23,7 +24,7 @@ export function VocabularyView({ today, reviews, hydrated, onAddReview, onReview
   reviews: VocabularyReview[];
   hydrated: boolean;
   onAddReview: (word: VocabularyWord, source: VocabularyReviewSource) => void;
-  onReview: (id: string, rating: ReviewRating) => void;
+  onReview: (id: string, rating: ReviewRating, minutes: number) => void;
 }) {
   const [tab, setTab] = useState<"review" | "browse">("review");
   const [completedIds, setCompletedIds] = useState<Set<string>>(() => new Set());
@@ -39,6 +40,11 @@ export function VocabularyView({ today, reviews, hydrated, onAddReview, onReview
   const [page, setPage] = useState(1);
   const [browseResult, setBrowseResult] = useState<BrowseResult | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const reviewStartedAtRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    reviewStartedAtRef.current = Date.now();
+  }, []);
 
   const due = dueVocabularyReviews(reviews, today).filter((review) => !completedIds.has(review.id));
   const currentReview = due[0] ?? null;
@@ -96,7 +102,9 @@ export function VocabularyView({ today, reviews, hydrated, onAddReview, onReview
 
   function rate(rating: ReviewRating) {
     if (!currentReview || !hydrated) return;
-    onReview(currentReview.id, rating);
+    const minutes = elapsedMinutes(reviewStartedAtRef.current);
+    reviewStartedAtRef.current = Date.now();
+    onReview(currentReview.id, rating, minutes);
     setCompletedIds((current) => new Set(current).add(currentReview.id));
     setRevealedFor(null);
   }

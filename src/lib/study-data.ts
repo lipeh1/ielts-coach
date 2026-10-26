@@ -1,4 +1,4 @@
-export type Skill = "reading" | "listening" | "writing" | "speaking";
+export type Skill = "reading" | "listening" | "writing" | "speaking" | "vocabulary";
 export type Profile = { targetBand: string; examDate: string; dailyTarget: number };
 export type StudyLog = { id: string; date: string; minutes: number; skill: Skill; correct: number; total: number };
 export type Mistake = { id: string; skill: Skill; question: string; reason: string; date: string; mastered: boolean };
@@ -31,7 +31,7 @@ export type SavedData = {
   vocabularySignals?: VocabularySignal[];
 };
 
-const skills = new Set(["listening", "reading", "writing", "speaking"]);
+const skills = new Set(["listening", "reading", "writing", "speaking", "vocabulary"]);
 const bands = new Set(["5.0", "5.5", "6.0", "6.5", "7.0", "7.5", "8.0", "8.5", "9.0"]);
 const reviewSources = new Set(["manual", "writing", "listening", "reading"]);
 

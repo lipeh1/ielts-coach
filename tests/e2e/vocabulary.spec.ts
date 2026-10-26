@@ -56,4 +56,5 @@ test("browse a word, add it to review, reveal and rate it", async ({ page }) => 
   expect(review?.lastReviewed).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   expect(review?.due).not.toBe(review?.lastReviewed);
   expect(writes.at(-1)?.checkIns).toHaveLength(1);
+  expect(writes.at(-1)?.logs).toEqual([expect.objectContaining({ skill: "vocabulary", minutes: 1 })]);
 });
