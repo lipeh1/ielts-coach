@@ -11,7 +11,7 @@ pnpm install
 pnpm dev
 ```
 
-开发和生产服务默认都运行在 `http://localhost:7500`。Node.js 20.9 或更新版本。
+开发和生产服务默认都运行在 `http://localhost:7500`。需要 Node.js 22.13 或更新版本（pnpm 11 的要求）。
 
 ## AI 写作批改
 
