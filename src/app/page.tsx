@@ -32,6 +32,8 @@ import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import type { FeedbackCriterion, FeedbackReport } from "@/lib/feedback";
 import { getDailyTask2Question } from "@/lib/questions-data";
 import { task2TypeLabels } from "@/lib/questions";
+import { gradeReadingPassage, type ReadingCompletionQuestion, type ReadingHeadingQuestion, type ReadingPassage, type ReadingQuestionResult, type ReadingResult, type ReadingTfngQuestion } from "@/lib/reading";
+import { readingPassage } from "@/lib/reading-data";
 import { defaultData, isValidState, type FeedbackHistoryEntry, type Mistake, type Profile, type SavedData, type Skill, type StudyLog } from "@/lib/study-data";
 import { diffWords } from "@/lib/word-diff";
 
@@ -46,7 +48,7 @@ const feedbackBandKeys = [
 
 const skills: { id: Skill; name: string; en: string; icon: typeof BookOpen; tint: string; minutes: number }[] = [
   { id: "listening", name: "听力", en: "Listening", icon: Headphones, tint: "blue", minutes: 12 },
-  { id: "reading", name: "阅读", en: "Reading", icon: BookOpen, tint: "green", minutes: 15 },
+  { id: "reading", name: "阅读", en: "Reading", icon: BookOpen, tint: "green", minutes: readingPassage.minutes },
   { id: "writing", name: "写作", en: "Writing", icon: PencilLine, tint: "orange", minutes: 20 },
   { id: "speaking", name: "口语", en: "Speaking", icon: Mic2, tint: "violet", minutes: 10 },
 ];
@@ -249,15 +251,16 @@ export default function Home() {
 
   function startSkill(skill: Skill) {
     if (!hydrated) return;
-    setActiveSkill(skill);
     setAnswer("");
     setSessionResult(null);
     if (skill === "writing") {
+      setActiveSkill(null);
       setFeedback(null);
       setFeedbackError("");
       setView("feedback");
       return;
     }
+    setActiveSkill(skill);
     setView("practice");
   }
 
@@ -269,22 +272,49 @@ export default function Home() {
   }
 
   function submitSession() {
-    if (!hydrated || !activeSkill || !answer || sessionResult) return;
-    const correctAnswer = activeSkill === "reading" ? "False" : "A quiet desk";
-    const correct = activeSkill === "speaking" || answer === correctAnswer;
-    const explanation = activeSkill === "reading"
-      ? "原文说明她每周都会去市中心图书馆，而题目说她很少去，所以判断为 False。注意区分 False 与 Not Given：这里原文给出了相反信息。"
-      : activeSkill === "listening"
-        ? "关键信息是 “a quiet desk”。听力题需要先识别需求，再排除提到但并非答案的细节。"
-        : "完成了一次口语练习。试着回听自己的回答，检查是否先给出观点，再用细节或例子展开。";
+    if (!hydrated || !activeSkill || activeSkill === "reading" || activeSkill === "writing" || !answer || sessionResult) return;
+    const correct = activeSkill === "speaking" || answer === "A quiet desk";
+    const explanation = activeSkill === "listening"
+      ? "关键信息是 “a quiet desk”。听力题需要先识别需求，再排除提到但并非答案的细节。"
+      : "完成了一次口语练习。试着回听自己的回答，检查是否先给出观点，再用细节或例子展开。";
     setSessionResult({ correct, explanation });
     const isOpenResponse = activeSkill === "speaking";
     recordSession(activeSkill, isOpenResponse ? 8 : 10, isOpenResponse ? 0 : correct ? 1 : 0, isOpenResponse ? 0 : 1);
     if (!correct) {
-      const question = activeSkill === "reading" ? "判断：The writer rarely visits the city library." : "听力细节：What does the speaker need for the report?";
-      const reason = activeSkill === "reading" ? "混淆了 False 与 Not Given；原文有直接反证。" : "漏听了需求关键词 quiet desk。";
-      setData((current) => ({ ...current, mistakes: [{ id: crypto.randomUUID(), skill: activeSkill, question, reason, date: localDateKey(), mastered: false }, ...current.mistakes] }));
+      setData((current) => ({ ...current, mistakes: [{ id: crypto.randomUUID(), skill: activeSkill, question: "听力细节：What does the speaker need for the report?", reason: "漏听了需求关键词 quiet desk。", date: localDateKey(), mastered: false }, ...current.mistakes] }));
     }
+  }
+
+  function submitReading(answers: Record<string, string>): ReadingResult | null {
+    if (!hydrated) return null;
+    const result = gradeReadingPassage(readingPassage, answers);
+    const today = localDateKey();
+    const log: StudyLog = { id: crypto.randomUUID(), date: today, minutes: readingPassage.minutes, skill: "reading", correct: result.correct, total: result.total };
+    setData((current) => {
+      let next: SavedData = {
+        ...current,
+        logs: [...current.logs, log],
+        checkIns: current.checkIns.includes(today) ? current.checkIns : [...current.checkIns, today],
+      };
+      for (const item of result.results) {
+        if (item.correct) continue;
+        const id = `${readingPassage.id}-q${item.question.number}`;
+        if (next.mistakes.some((mistake) => mistake.id === id)) continue;
+        next = {
+          ...next,
+          mistakes: [{
+            id,
+            skill: "reading",
+            question: `Passage 1 · Q${item.question.number}: ${item.question.prompt}`,
+            reason: item.question.explanation,
+            date: today,
+            mastered: false,
+          }, ...next.mistakes],
+        };
+      }
+      return next;
+    });
+    return result;
   }
 
   function markMastered(id: string) {
@@ -376,7 +406,7 @@ export default function Home() {
 
   return (
     <div className="app-shell">
-      <Sidebar view={view} onNavigate={(next) => { setView(next); if (next !== "practice") setActiveSkill(null); }} openSettings={openGoalSettings} pendingReviews={pendingMistakes.length} />
+      <Sidebar view={view} onNavigate={(next) => { setView(next); setActiveSkill(null); }} openSettings={openGoalSettings} pendingReviews={pendingMistakes.length} />
       <main className="main-area">
         <header className="topbar">
           <div className="breadcrumbs"><span>我的学习</span><span className="crumb-divider">/</span><strong>{title}</strong></div>
@@ -471,7 +501,7 @@ export default function Home() {
           </>}
 
           {view === "practice" && <>
-            {activeSkill ? <PracticeSession skill={activeSkill} answer={answer} setAnswer={setAnswer} result={sessionResult} onSubmit={submitSession} onBack={() => { setActiveSkill(null); setSessionResult(null); }} onPlay={playListening} /> : <>
+            {activeSkill === "reading" ? <ReadingSession passage={readingPassage} ready={hydrated} onSubmit={submitReading} onBack={() => setActiveSkill(null)} /> : activeSkill === "listening" || activeSkill === "speaking" ? <PracticeSession skill={activeSkill} answer={answer} setAnswer={setAnswer} result={sessionResult} onSubmit={submitSession} onBack={() => { setActiveSkill(null); setSessionResult(null); }} onPlay={playListening} /> : <>
               <div className="page-title-row"><div><div className="eyebrow">练习与模考</div><h1>练习中心</h1><p>按科目和可用时间选择一项，练习后查看解析。</p></div><span className="small-pill"><AlarmClock size={14} />按 10–20 分钟设计</span></div>
               <div className="practice-overview"><div className="practice-overview-main"><span className="eyebrow">适合工作日的节奏</span><h2>一段专注时间，完成一个小目标。</h2><p>练习会自动计入今日计划。答错的题目进入错题复习，并影响下一次推荐。</p></div><div className="practice-overview-side"><strong>{data.profile.dailyTarget}</strong><span>每日目标 · 分钟</span><button className="text-action" onClick={openGoalSettings}>调整 <ArrowRight size={14} /></button></div></div>
               <section className="section-block practice-list-section"><SectionHeading eyebrow="选择科目" title="开始一项练习" /><div className="practice-cards">{skills.map(({ id, name, en, icon: Icon, tint, minutes }) => <article className="practice-card" key={id}><div className="practice-card-top"><span className={`skill-icon ${tint}`}><Icon size={20} /></span><span className="practice-count">{data.logs.filter((log) => log.skill === id).length} 次完成</span></div><h3>{name}<small>{en}</small></h3><p>{id === "listening" ? "场景对话、细节捕捉与同义表达辨认。" : id === "reading" ? "段落定位、题型策略与同义替换练习。" : id === "writing" ? "Task 1 / Task 2 写作，并获得四项标准反馈。" : "逐题作答、Part 2 个人陈述与表达复盘。"}</p><div className="practice-card-footer"><span><Clock3 size={14} />约 {minutes} 分钟</span><AppButton variant="secondary" icon={ArrowRight} onClick={() => startSkill(id)}>开始练习</AppButton></div></article>)}</div></section>
@@ -573,18 +603,164 @@ export default function Home() {
   );
 }
 
-function PracticeSession({ skill, answer, setAnswer, result, onSubmit, onBack, onPlay }: { skill: Skill; answer: string; setAnswer: (value: string) => void; result: { correct: boolean; explanation: string } | null; onSubmit: () => void; onBack: () => void; onPlay: () => void }) {
-  const isReading = skill === "reading";
-  const isListening = skill === "listening";
-  const isSpeaking = skill === "speaking";
-  const questionText = isReading ? "The writer rarely visits the city library." : "What does the speaker need to finish the report?";
+function ReadingSession({ passage, ready, onSubmit, onBack }: {
+  passage: ReadingPassage;
+  ready: boolean;
+  onSubmit: (answers: Record<string, string>) => ReadingResult | null;
+  onBack: () => void;
+}) {
+  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [result, setResult] = useState<ReadingResult | null>(null);
+
+  const tfngQuestions = passage.questions.filter((question): question is ReadingTfngQuestion => question.type === "true-false-not-given");
+  const headingQuestions = passage.questions.filter((question): question is ReadingHeadingQuestion => question.type === "matching-headings");
+  const completionQuestions = passage.questions.filter((question): question is ReadingCompletionQuestion => question.type === "summary-completion");
+  const answered = passage.questions.filter((question) => (answers[question.id] ?? "").trim()).length;
+
+  function updateAnswer(id: string, value: string) {
+    setAnswers((current) => ({ ...current, [id]: value }));
+  }
+
+  function submit() {
+    const graded = onSubmit(answers);
+    if (graded) setResult(graded);
+  }
+
+  function feedbackFor(id: string) {
+    return result?.results.find((entry) => entry.question.id === id) ?? null;
+  }
+
+  function headingText(id: string) {
+    return passage.headings.find((heading) => heading.id === id)?.text ?? "";
+  }
+
   return <>
     <button className="back-link" onClick={onBack}><ArrowLeft size={16} />返回练习中心</button>
-    <div className="practice-session-heading"><div><div className="eyebrow">{skillNames[skill]} · 练习</div><h1>{isReading ? "判断题：信息核对" : isListening ? "场景听力：抓住细节" : "Part 2：个人经历"}</h1><p>{isReading ? "阅读段落，判断题目与原文信息是否一致。" : isListening ? "听取对话中的关键信息，选择最符合题意的答案。" : "围绕题目持续表达，并尽量使用具体细节支撑内容。"}</p></div><span className="session-timer"><Clock3 size={15} />约 {isSpeaking ? 8 : 10} 分钟</span></div>
-    <div className="session-layout"><section className="question-panel">
-      {isReading ? <><div className="passage-label"><BookOpen size={15} />Passage · City libraries</div><div className="reading-passage"><p>For many residents, the public library is more than a place to borrow books. It also offers quiet study rooms, free internet access and weekly talks from local historians. While some branches have reduced their opening hours, the central library remains open every day until 8 p.m.</p><p>Maria, who works nearby, stops at the central library on her way home at least three evenings each week. She says the quiet reading room helps her finish an online course without interruptions.</p></div><div className="question-divider" /><div className="question-number">Question 1 <span>TRUE / FALSE / NOT GIVEN</span></div><h2>{questionText}</h2><div className="answer-options">{["True", "False", "Not Given"].map((option) => <button className={answer === option ? "chosen" : ""} key={option} onClick={() => setAnswer(option)} disabled={!!result}><span className="radio-mark" />{option}</button>)}</div></> : isListening ? <><div className="passage-label"><Headphones size={15} />Listening · Office conversation</div><div className="audio-player"><button className="audio-play" onClick={onPlay} aria-label="播放听力"><Volume2 size={20} /></button><div className="audio-wave" aria-hidden="true">{Array.from({ length: 42 }, (_, index) => <i key={index} style={{ height: `${12 + ((index * 17) % 29)}px` }} />)}</div><span>0:08</span></div><p className="audio-hint">点击播放听力内容，可重复收听。</p><div className="question-divider" /><div className="question-number">Question 1 <span>MULTIPLE CHOICE</span></div><h2>{questionText}</h2><div className="answer-options">{["A quiet desk", "A new laptop", "A meeting room"].map((option) => <button className={answer === option ? "chosen" : ""} key={option} onClick={() => setAnswer(option)} disabled={!!result}><span className="radio-mark" />{option}</button>)}</div></> : <><div className="passage-label"><Mic2 size={15} />Speaking · Part 2</div><div className="speaking-prompt"><div className="prompt-label">Describe a skill you learned recently</div><p>You should say:</p><ul><li>what the skill is</li><li>how you learned it</li><li>why you decided to learn it</li><li>and explain how you felt about learning it</li></ul><span><Clock3 size={14} />1 minute to prepare · speak for up to 2 minutes</span></div><label className="answer-label" htmlFor="speaking-answer">练习后记录你的回答要点</label><textarea id="speaking-answer" className="speaking-answer" value={answer} onChange={(event) => setAnswer(event.target.value)} placeholder="可以用英文记录你的回答，也可以先口头练习，再写下关键词……" disabled={!!result} /></>}
-      {result && <div className={`answer-feedback ${result.correct ? "correct" : "incorrect"}`} role="status"><div className="answer-feedback-title">{result.correct ? <Check size={17} /> : <CircleHelp size={17} />}{result.correct ? "回答正确" : "再看一下原文依据"}</div><p>{result.explanation}</p></div>}
-      <div className="session-actions">{result ? <AppButton variant="primary" icon={ArrowRight} onClick={onBack}>完成练习</AppButton> : <AppButton variant="primary" icon={Check} onClick={onSubmit} disabled={!answer}>{isSpeaking ? "完成口语练习" : "提交答案"}</AppButton>}<span>练习结果会计入今日目标</span></div>
-    </section><aside className="session-help"><div className="help-heading"><Lightbulb size={17} /><strong>答题提醒</strong></div>{isReading ? <><p>先定位对应段落，再判断题目与原文的关系。</p><div className="help-point"><strong>False</strong><span>原文与题目意思相反</span></div><div className="help-point"><strong>Not Given</strong><span>原文没有提供足够信息判断</span></div></> : isListening ? <><p>首次收听时关注整体场景，第二次确认问题中的关键词。</p><div className="help-point"><strong>注意</strong><span>听到的原词不一定就是答案，也要核对它是否回应题目。</span></div></> : <><p>保持自然表达，不需要把提示卡上的每一条都回答成独立短句。</p><div className="help-point"><strong>结构</strong><span>先回答主题，再用一段经历或例子展开。</span></div><div className="help-point"><strong>复盘</strong><span>留意停顿、重复词和回答是否偏题。</span></div></>}</aside></div>
+    <div className="practice-session-heading">
+      <div><div className="eyebrow">阅读 · 完整 Passage 1</div><h1>{passage.title}</h1><p>阅读文章，完成 13 道题。提交后查看答案与解析。</p></div>
+      <span className="session-timer"><Clock3 size={15} />约 {passage.minutes} 分钟</span>
+    </div>
+    {result && <div className="reading-score" role="status"><strong>{result.correct} / {result.total}</strong><span>答对题数</span></div>}
+    <div className="reading-session-layout">
+      <section className="reading-passage-panel">
+        <div className="passage-label"><BookOpen size={15} />Reading Passage 1</div>
+        {passage.paragraphs.map((paragraph) => <div className="reading-block" key={paragraph.label}>
+          <span className="reading-paragraph-label">{paragraph.label}</span>
+          <p>{paragraph.text}</p>
+        </div>)}
+      </section>
+      <section className="reading-questions-panel">
+        <ReadingQuestionGroup title="Questions 1–5" typeLabel="TRUE / FALSE / NOT GIVEN">
+          {tfngQuestions.map((question) => {
+            const graded = feedbackFor(question.id);
+            return <article className="reading-question" key={question.id}>
+              <div className="question-number">Question {question.number} <span>TRUE / FALSE / NOT GIVEN</span></div>
+              <h3>{question.prompt}</h3>
+              <div className="answer-options">
+                {(["True", "False", "Not Given"] as const).map((option) => {
+                  const selected = answers[question.id] === option;
+                  const isCorrect = !!result && option === question.answer;
+                  const isWrong = !!result && selected && !graded?.correct;
+                  return <button className={`${selected ? "chosen" : ""} ${isCorrect ? "correct-answer" : ""} ${isWrong ? "wrong-answer" : ""}`} key={option} onClick={() => updateAnswer(question.id, option)} disabled={!!result}>{option}</button>;
+                })}
+              </div>
+              {graded && <ReadingFeedback graded={graded} question={question} headingText={headingText} />}
+            </article>;
+          })}
+        </ReadingQuestionGroup>
+
+        <ReadingQuestionGroup title="Questions 6–9" typeLabel="MATCHING HEADINGS">
+          <div className="heading-options">
+            {passage.headings.map((heading) => <div key={heading.id}><span>{heading.id}</span>{heading.text}</div>)}
+          </div>
+          {headingQuestions.map((question) => {
+            const graded = feedbackFor(question.id);
+            return <article className="reading-question" key={question.id}>
+              <div className="question-number">Question {question.number} <span>MATCHING HEADINGS</span></div>
+              <h3>{question.prompt}</h3>
+              <select className="reading-select" value={answers[question.id] ?? ""} onChange={(event) => updateAnswer(question.id, event.target.value)} disabled={!!result} aria-label={`Question ${question.number} heading`}>
+                <option value="">选择标题</option>
+                {passage.headings.map((heading) => <option value={heading.id} key={heading.id}>{heading.id} · {heading.text}</option>)}
+              </select>
+              {graded && <ReadingFeedback graded={graded} question={question} headingText={headingText} />}
+            </article>;
+          })}
+        </ReadingQuestionGroup>
+
+        <ReadingQuestionGroup title="Questions 10–13" typeLabel="SUMMARY COMPLETION">
+          {completionQuestions.map((question) => {
+            const graded = feedbackFor(question.id);
+            return <article className="reading-question" key={question.id}>
+              <div className="question-number">Question {question.number} <span>SUMMARY COMPLETION</span></div>
+              <h3>{question.prompt}</h3>
+              <input className="reading-input" type="text" value={answers[question.id] ?? ""} onChange={(event) => updateAnswer(question.id, event.target.value)} disabled={!!result} placeholder="输入答案" autoComplete="off" aria-label={`Question ${question.number} answer`} />
+              {graded && <ReadingFeedback graded={graded} question={question} headingText={headingText} />}
+            </article>;
+          })}
+        </ReadingQuestionGroup>
+      </section>
+    </div>
+    <div className="reading-actions">
+      {result ? <AppButton variant="primary" icon={ArrowRight} onClick={onBack}>完成练习</AppButton> : <AppButton variant="primary" icon={Check} onClick={submit} disabled={!ready || answered < passage.questions.length}>{`提交答案（${answered}/${passage.questions.length}）`}</AppButton>}
+      <span>提交后记录用时与错题</span>
+    </div>
+  </>;
+}
+
+function ReadingQuestionGroup({ title, typeLabel, children }: { title: string; typeLabel: string; children: React.ReactNode }) {
+  return <section className="reading-question-group">
+    <div className="reading-group-heading"><span>{title}</span><small>{typeLabel}</small></div>
+    {children}
+  </section>;
+}
+
+function ReadingFeedback({ graded, question, headingText }: {
+  graded: ReadingQuestionResult;
+  question: ReadingTfngQuestion | ReadingHeadingQuestion | ReadingCompletionQuestion;
+  headingText: (id: string) => string;
+}) {
+  return <div className={`answer-feedback ${graded.correct ? "correct" : "incorrect"}`} role="status">
+    <div className="answer-feedback-title">{graded.correct ? <Check size={17} /> : <CircleHelp size={17} />}{graded.correct ? "回答正确" : "回答错误"}</div>
+    {!graded.correct && <p><strong>参考答案</strong> {graded.expected}{question.type === "matching-headings" ? ` · ${headingText(question.answer)}` : ""}</p>}
+    <p>{question.explanation}</p>
+    {question.evidence
+      ? <blockquote className="reading-evidence">“{question.evidence}”</blockquote>
+      : question.type === "true-false-not-given" ? <p className="reading-no-evidence">原文没有提供足够信息判断。</p> : null}
+  </div>;
+}
+
+function PracticeSession({ skill, answer, setAnswer, result, onSubmit, onBack, onPlay }: { skill: "listening" | "speaking"; answer: string; setAnswer: (value: string) => void; result: { correct: boolean; explanation: string } | null; onSubmit: () => void; onBack: () => void; onPlay: () => void }) {
+  const isListening = skill === "listening";
+  const isSpeaking = skill === "speaking";
+  return <>
+    <button className="back-link" onClick={onBack}><ArrowLeft size={16} />返回练习中心</button>
+    <div className="practice-session-heading">
+      <div><div className="eyebrow">{skillNames[skill]} · 练习</div><h1>{isListening ? "场景听力：抓住细节" : "Part 2：个人经历"}</h1><p>{isListening ? "听取对话中的关键信息，选择最符合题意的答案。" : "围绕题目持续表达，并尽量使用具体细节支撑内容。"}</p></div>
+      <span className="session-timer"><Clock3 size={15} />约 {isSpeaking ? 8 : 10} 分钟</span>
+    </div>
+    <div className="session-layout">
+      <section className="question-panel">
+        {isListening ? <>
+          <div className="passage-label"><Headphones size={15} />Listening · Office conversation</div>
+          <div className="audio-player"><button className="audio-play" onClick={onPlay} aria-label="播放听力"><Volume2 size={20} /></button><div className="audio-wave" aria-hidden="true">{Array.from({ length: 42 }, (_, index) => <i key={index} style={{ height: `${12 + ((index * 17) % 29)}px` }} />)}</div><span>0:08</span></div>
+          <p className="audio-hint">点击播放听力内容，可重复收听。</p>
+          <div className="question-divider" />
+          <div className="question-number">Question 1 <span>MULTIPLE CHOICE</span></div>
+          <h2>What does the speaker need to finish the report?</h2>
+          <div className="answer-options">{["A quiet desk", "A new laptop", "A meeting room"].map((option) => <button className={answer === option ? "chosen" : ""} key={option} onClick={() => setAnswer(option)} disabled={!!result}><span className="radio-mark" />{option}</button>)}</div>
+        </> : <>
+          <div className="passage-label"><Mic2 size={15} />Speaking · Part 2</div>
+          <div className="speaking-prompt"><div className="prompt-label">Describe a skill you learned recently</div><p>You should say:</p><ul><li>what the skill is</li><li>how you learned it</li><li>why you decided to learn it</li><li>and explain how you felt about learning it</li></ul><span><Clock3 size={14} />1 minute to prepare · speak for up to 2 minutes</span></div>
+          <label className="answer-label" htmlFor="speaking-answer">练习后记录你的回答要点</label>
+          <textarea id="speaking-answer" className="speaking-answer" value={answer} onChange={(event) => setAnswer(event.target.value)} placeholder="可以用英文记录你的回答，也可以先口头练习，再写下关键词……" disabled={!!result} />
+        </>}
+        {result && <div className={`answer-feedback ${result.correct ? "correct" : "incorrect"}`} role="status"><div className="answer-feedback-title">{result.correct ? <Check size={17} /> : <CircleHelp size={17} />}{result.correct ? "回答正确" : "再看一下原文依据"}</div><p>{result.explanation}</p></div>}
+        <div className="session-actions">{result ? <AppButton variant="primary" icon={ArrowRight} onClick={onBack}>完成练习</AppButton> : <AppButton variant="primary" icon={Check} onClick={onSubmit} disabled={!answer}>{isSpeaking ? "完成口语练习" : "提交答案"}</AppButton>}<span>练习结果会计入今日目标</span></div>
+      </section>
+      <aside className="session-help">
+        <div className="help-heading"><Lightbulb size={17} /><strong>答题提醒</strong></div>
+        {isListening ? <><p>首次收听时关注整体场景，第二次确认问题中的关键词。</p><div className="help-point"><strong>注意</strong><span>听到的原词不一定就是答案，也要核对它是否回应题目。</span></div></> : <><p>保持自然表达，不需要把提示卡上的每一条都回答成独立短句。</p><div className="help-point"><strong>结构</strong><span>先回答主题，再用一段经历或例子展开。</span></div><div className="help-point"><strong>复盘</strong><span>留意停顿、重复词和回答是否偏题。</span></div></>}
+      </aside>
+    </div>
   </>;
 }

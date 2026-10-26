@@ -1,0 +1,151 @@
+{
+  "id": "reading-01",
+  "version": 1,
+  "title": "Green Roofs in Modern Cities",
+  "minutes": 20,
+  "paragraphs": [
+    {
+      "label": "A",
+      "text": "Green roofs are roofs covered with a layer of plants and soil. They have become increasingly common in cities looking for ways to adapt to a warmer climate. Unlike a traditional flat roof, a green roof includes a waterproof membrane, a drainage layer, a growing medium and vegetation. The idea is not new, but recent interest has been driven by rising summer temperatures and pressure on urban space. Supporters argue that a roof can do more than keep out rain: it can become a small ecosystem that provides insulation, absorbs rainwater and supports insects and birds. Some cities now treat green roofs as part of their wider strategy for cooling streets and managing water, rather than as a decorative extra."
+    },
+    {
+      "label": "B",
+      "text": "One of the main benefits is stormwater management. During heavy rain, conventional roofs send water quickly into drains, which can overflow and pollute rivers. A green roof absorbs some of this water and releases it slowly, reducing pressure on drainage systems. The plants and soil also provide insulation, keeping buildings cooler in summer and warmer in winter. In dense neighbourhoods, this can lower the demand for air conditioning. Green roofs can also create habitats for bees, butterflies and other species that struggle in paved areas, and they can give residents access to shared garden space. The combined effect is a roof that works as a small piece of infrastructure rather than a passive surface."
+    },
+    {
+      "label": "C",
+      "text": "However, green roofs are not suitable for every building. The extra weight of soil, water and plants may require structural reinforcement, especially in older buildings. Installation costs are higher than those of a conventional roof, and careful waterproofing is essential to prevent leaks. Maintenance also varies: some lightweight roofs with drought-resistant plants need little attention, while intensive roofs with trees and vegetable beds require regular watering, weeding and inspection. In dry regions, the water needed to keep plants alive can be a serious concern, and poorly designed roofs may fail within a few years. For these reasons, planners need to consider the building's age, structure and local climate before approving a project."
+    },
+    {
+      "label": "D",
+      "text": "Policy has played an important role in the spread of green roofs. Some cities offer grants, tax reductions or planning incentives to owners who install them, and a few require new commercial buildings to include a green roof. In several European cities, green roofs have been combined with solar panels, because plants can keep the panels cooler and improve their efficiency. The results are not uniform, and the success of a project depends on local climate, building design and long-term maintenance. For cities facing heat, flooding and limited green space, however, the roof is increasingly seen as a practical piece of infrastructure rather than as an optional design feature."
+    }
+  ],
+  "headings": [
+    { "id": "A", "text": "Financial and structural challenges" },
+    { "id": "B", "text": "A response to urban heat and limited space" },
+    { "id": "C", "text": "How plants clean the air" },
+    { "id": "D", "text": "Managing rainwater and improving building comfort" },
+    { "id": "E", "text": "Government support and future applications" },
+    { "id": "F", "text": "The history of roof gardens" }
+  ],
+  "questions": [
+    {
+      "id": "q1",
+      "number": 1,
+      "type": "true-false-not-given",
+      "prompt": "Green roofs can only be installed on new buildings.",
+      "answer": "False",
+      "explanation": "文章提到旧建筑可能需要结构加固，说明旧建筑也可以安装，并非只能用于新建建筑。",
+      "evidence": "The extra weight of soil, water and plants may require structural reinforcement, especially in older buildings."
+    },
+    {
+      "id": "q2",
+      "number": 2,
+      "type": "true-false-not-given",
+      "prompt": "Green roofs can reduce the amount of rainwater that reaches drainage systems.",
+      "answer": "True",
+      "explanation": "B 段明确说明绿色屋顶吸收部分雨水并缓慢释放，从而减轻排水系统压力。",
+      "evidence": "A green roof absorbs some of this water and releases it slowly, reducing pressure on drainage systems."
+    },
+    {
+      "id": "q3",
+      "number": 3,
+      "type": "true-false-not-given",
+      "prompt": "The passage says that green roofs are more common in Europe than in Asia.",
+      "answer": "Not Given",
+      "explanation": "文章只提到欧洲一些城市，没有将欧洲与亚洲的普及程度进行比较。",
+      "evidence": ""
+    },
+    {
+      "id": "q4",
+      "number": 4,
+      "type": "true-false-not-given",
+      "prompt": "Some local governments provide financial support for green roofs.",
+      "answer": "True",
+      "explanation": "D 段提到一些城市提供补助、减税或规划激励。",
+      "evidence": "Some cities offer grants, tax reductions or planning incentives to owners who install them"
+    },
+    {
+      "id": "q5",
+      "number": 5,
+      "type": "true-false-not-given",
+      "prompt": "All green roofs require the same amount of maintenance.",
+      "answer": "False",
+      "explanation": "C 段说明维护需求因屋顶类型而异，轻量型与密集型差别很大。",
+      "evidence": "Maintenance also varies: some lightweight roofs with drought-resistant plants need little attention, while intensive roofs with trees and vegetable beds require regular watering, weeding and inspection."
+    },
+    {
+      "id": "q6",
+      "number": 6,
+      "type": "matching-headings",
+      "prompt": "Paragraph A",
+      "answer": "B",
+      "explanation": "A 段介绍绿色屋顶兴起的原因：城市变暖、空间紧张，并把它视为城市策略的一部分。",
+      "evidence": "They have become increasingly common in cities looking for ways to adapt to a warmer climate."
+    },
+    {
+      "id": "q7",
+      "number": 7,
+      "type": "matching-headings",
+      "prompt": "Paragraph B",
+      "answer": "D",
+      "explanation": "B 段主要讲雨水管理、隔热降温以及生物多样性。",
+      "evidence": "A green roof absorbs some of this water and releases it slowly, reducing pressure on drainage systems."
+    },
+    {
+      "id": "q8",
+      "number": 8,
+      "type": "matching-headings",
+      "prompt": "Paragraph C",
+      "answer": "A",
+      "explanation": "C 段讲结构加固、安装成本和维护差异，对应财务与结构挑战。",
+      "evidence": "The extra weight of soil, water and plants may require structural reinforcement, especially in older buildings."
+    },
+    {
+      "id": "q9",
+      "number": 9,
+      "type": "matching-headings",
+      "prompt": "Paragraph D",
+      "answer": "E",
+      "explanation": "D 段讲政策补贴、规划激励，以及绿色屋顶与太阳能板结合的应用。",
+      "evidence": "Some cities offer grants, tax reductions or planning incentives to owners who install them"
+    },
+    {
+      "id": "q10",
+      "number": 10,
+      "type": "summary-completion",
+      "prompt": "A green roof absorbs rainwater and releases it slowly, reducing pressure on ___.",
+      "answers": ["drainage systems", "drainage system", "drains"],
+      "explanation": "B 段说绿色屋顶减轻排水系统压力。",
+      "evidence": "A green roof absorbs some of this water and releases it slowly, reducing pressure on drainage systems."
+    },
+    {
+      "id": "q11",
+      "number": 11,
+      "type": "summary-completion",
+      "prompt": "Older buildings may need structural ___ before a green roof is installed.",
+      "answers": ["reinforcement", "support"],
+      "explanation": "C 段提到旧建筑可能需要结构加固。",
+      "evidence": "The extra weight of soil, water and plants may require structural reinforcement, especially in older buildings."
+    },
+    {
+      "id": "q12",
+      "number": 12,
+      "type": "summary-completion",
+      "prompt": "Lightweight roofs with ___ plants generally need less maintenance.",
+      "answers": ["drought-resistant", "drought resistant"],
+      "explanation": "C 段说带有耐旱植物的轻量型屋顶几乎不需要太多维护。",
+      "evidence": "some lightweight roofs with drought-resistant plants need little attention"
+    },
+    {
+      "id": "q13",
+      "number": 13,
+      "type": "summary-completion",
+      "prompt": "Some cities offer grants or tax reductions to encourage owners to install ___.",
+      "answers": ["green roofs", "a green roof"],
+      "explanation": "D 段说一些城市通过补助、减税或规划激励鼓励业主安装绿色屋顶。",
+      "evidence": "Some cities offer grants, tax reductions or planning incentives to owners who install them"
+    }
+  ]
+}

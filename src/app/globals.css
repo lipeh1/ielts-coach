@@ -263,6 +263,38 @@ button:disabled { cursor: not-allowed; opacity: .52; }
 .help-point { display: grid; gap: 3px; padding: 10px 0; border-top: 1px solid var(--border); }
 .help-point strong { color: #45423d; font-size: 11px; }
 .help-point span { color: var(--text-secondary); font-size: 10px; line-height: 1.55; }
+.reading-score { display: flex; align-items: baseline; gap: 8px; margin: 0 0 16px; }
+.reading-score strong { color: var(--accent); font-size: 26px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.reading-score span { color: var(--text-secondary); font-size: 11px; }
+.reading-session-layout { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr); align-items: start; gap: 18px; }
+.reading-passage-panel, .reading-questions-panel { border: 1px solid var(--border); border-radius: 8px; background: var(--surface); }
+.reading-passage-panel { padding: 20px; }
+.reading-block { display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 10px; padding: 14px 0; border-top: 1px solid var(--border); }
+.reading-passage-panel .reading-block:nth-child(2) { border-top: 0; padding-top: 16px; }
+.reading-paragraph-label { display: grid; width: 21px; height: 21px; place-items: center; border-radius: 5px; background: var(--surface-subtle); color: var(--text-secondary); font-size: 10px; font-weight: 650; }
+.reading-block p { margin: 0; color: #373737; font-family: Georgia, "Times New Roman", "Microsoft YaHei", serif; font-size: 13px; line-height: 1.85; }
+.reading-questions-panel { display: grid; gap: 12px; padding: 16px; }
+.reading-question-group { display: grid; gap: 4px; }
+.reading-group-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; padding-bottom: 9px; border-bottom: 1px solid var(--border); }
+.reading-group-heading span { font-size: 12px; font-weight: 650; }
+.reading-group-heading small { color: var(--text-tertiary); font-size: 9px; }
+.reading-question { padding: 13px 0; border-bottom: 1px solid var(--border); }
+.reading-question:last-child { padding-bottom: 2px; border-bottom: 0; }
+.reading-question h3 { margin: 7px 0 10px; font-size: 13px; font-weight: 550; line-height: 1.55; }
+.reading-question .answer-options { gap: 6px; }
+.reading-question .answer-options button { min-height: 38px; }
+.answer-options button.correct-answer { border-color: #bfdfc8; background: var(--success-subtle); color: #1e6338; }
+.answer-options button.wrong-answer { border-color: #edc5c2; background: var(--danger-subtle); color: #84211a; }
+.heading-options { display: grid; gap: 6px; margin: 10px 0 4px; padding: 10px 12px; border-radius: 6px; background: var(--surface-subtle); }
+.heading-options > div { display: flex; gap: 8px; color: var(--text-secondary); font-size: 10px; line-height: 1.5; }
+.heading-options > div span { color: var(--text); font-weight: 650; }
+.reading-select, .reading-input { width: 100%; min-height: 40px; padding: 0 10px; border: 1px solid var(--border); border-radius: 6px; background: white; color: var(--text); font: inherit; font-size: 12px; }
+.reading-select:focus, .reading-input:focus { border-color: var(--focus-ring); outline: 2px solid var(--accent-subtle); }
+.reading-evidence { margin: 9px 0 0; padding: 8px 10px; border-left: 2px solid #ccd9e9; background: #f8f8f6; color: var(--text-secondary); font-family: Georgia, "Times New Roman", var(--font-ui); font-size: 10px; line-height: 1.6; }
+.reading-no-evidence { color: var(--text-tertiary); font-style: italic; }
+.reading-actions { display: flex; align-items: center; gap: 12px; margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--border); }
+.reading-actions > span { color: var(--text-tertiary); font-size: 10px; }
+@media (max-width: 900px) { .reading-session-layout { grid-template-columns: minmax(0, 1fr); } }
 
 .filter-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
 .filter-row button { display: inline-flex; min-height: 33px; align-items: center; gap: 6px; padding: 0 10px; border: 1px solid transparent; border-radius: 6px; background: transparent; color: var(--text-secondary); cursor: pointer; font-size: 11px; }
