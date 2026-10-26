@@ -29,6 +29,7 @@
 
 # local downloads
 /.tmp/
+/.cert/
 
 # debug
 npm-debug.log*
