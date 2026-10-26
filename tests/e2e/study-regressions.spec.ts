@@ -60,12 +60,6 @@ async function assertModificationsLocked(page: Page) {
   await expect(page.getByRole("button", { name: "提交批改", exact: true })).toBeDisabled();
 }
 
-async function openListening(page: Page) {
-  await page.getByRole("button", { name: "练习中心", exact: true }).first().click();
-  await page.locator(".practice-card").filter({ has: page.getByRole("heading", { name: /^听力/ }) }).getByRole("button", { name: "开始练习" }).click();
-  await expect(page.getByRole("heading", { name: "场景听力：抓住细节" })).toBeVisible();
-}
-
 const failedReads = [
   { name: "HTTP failure", response: { status: 500, json: { error: "Read unavailable" } } },
   { name: "malformed JSON", response: { contentType: "application/json", body: "{not-json" } },
@@ -118,30 +112,22 @@ test("retrying a failed read loads saved records without an initial write", asyn
   expect(writes).toEqual([]);
 });
 
-for (const [answer, correct] of [["A quiet desk", true], ["A new laptop", false], ["A meeting room", false]] as const) {
-  test(`listening grades ${answer} as ${correct ? "correct" : "incorrect"}`, async ({ page }) => {
-    const writes = await mockStudy(page, (route) => route.fulfill({ json: { state: null } }));
-    await page.goto("/");
-    await expect(page.getByText("正在读取学习记录，载入后即可开始练习。")).toHaveCount(0);
-    await openListening(page);
-    await settleRender(page);
-    expect(writes).toEqual([]);
+test("speaking practice records a completed session without mistakes", async ({ page }) => {
+  const writes = await mockStudy(page, (route) => route.fulfill({ json: { state: null } }));
+  await page.goto("/");
+  await expect(page.getByText("正在读取学习记录，载入后即可开始练习。")).toHaveCount(0);
+  await page.getByRole("button", { name: "练习中心", exact: true }).first().click();
+  await page.locator(".practice-card").filter({ has: page.getByRole("heading", { name: /^口语/ }) }).getByRole("button", { name: "开始练习" }).click();
 
-    await page.getByRole("button", { name: answer, exact: true }).click();
-    await page.getByRole("button", { name: "提交答案", exact: true }).click();
-    await expect(page.getByText(correct ? "回答正确" : "再看一下原文依据", { exact: true })).toBeVisible();
-    await expect(page.getByText("学习记录已保存到服务端。", { exact: true })).toBeVisible();
-    await expect.poll(() => writes.length).toBe(1);
-    expect(writes[0].logs).toHaveLength(1);
-    expect(writes[0].logs[0]).toMatchObject({ skill: "listening", correct: correct ? 1 : 0, total: 1 });
-    expect(writes[0].checkIns).toHaveLength(1);
-    expect(writes[0].mistakes).toHaveLength(correct ? 0 : 1);
-    if (!correct) expect(writes[0].mistakes[0]).toMatchObject({ skill: "listening", mastered: false });
+  await expect(page.getByRole("heading", { name: "Part 2：个人经历" })).toBeVisible();
+  await page.getByLabel("练习后记录你的回答要点").fill("I learned to cook a simple meal during my first year at university.");
+  await page.getByRole("button", { name: "完成口语练习", exact: true }).click();
+  await expect(page.getByText("练习完成", { exact: true })).toBeVisible();
 
-    await page.getByRole("button", { name: /错题复练/ }).first().click();
-    await expect(page.getByRole("heading", { name: correct ? "暂时没有待复习错题" : "听力细节：What does the speaker need for the report?", exact: true })).toBeVisible();
-  });
-}
+  await expect.poll(() => writes.length).toBe(1);
+  expect(writes[0].logs[0]).toMatchObject({ skill: "speaking", minutes: 8, correct: 0, total: 0 });
+  expect(writes[0].mistakes).toHaveLength(0);
+});
 
 test("editing a loaded profile retains existing records and does not save on load", async ({ page }) => {
   const state = populatedState();

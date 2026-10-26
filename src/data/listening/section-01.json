@@ -1,0 +1,130 @@
+{
+  "id": "listening-01",
+  "version": 1,
+  "title": "Riverside Community Garden Volunteer Induction",
+  "audioMinutes": 4,
+  "practiceMinutes": 10,
+  "script": [
+    "Good morning, everyone, and welcome to the Riverside Community Garden. My name is Maria Lopez, and I am the volunteer coordinator. This short induction will explain how the garden works, what volunteers do, and how you can get involved. Please keep this information for your first visit.",
+    "The garden was created in 2005 on the site of an old car park. At first it had only twelve small plots, but it now covers almost half a hectare and includes a greenhouse, a children's plot, a tool shed and a small orchard. The garden is open every day from eight in the morning until six in the evening, except on public holidays. We ask everyone to sign in at the tool shed when they arrive.",
+    "This month the children's plot is closed while we repair the paths, so please do not use that area. The main paths are also being widened to make them easier for wheelchairs and pushchairs. If you see a red warning sign, please follow the alternative route marked on the map near the north entrance.",
+    "Before you start, you must attend a short safety session. These sessions are held every Saturday morning at ten o'clock and last about forty-five minutes. They cover basic tool safety, first aid, and what to do if the weather changes suddenly. You only need to attend once, but you are welcome to come again if you want a refresher.",
+    "On your first day, please bring a pair of gloves and a water bottle. We provide tools, aprons and tea. Strong shoes are also important because the ground can be wet. Please do not bring your own power tools unless a staff member has checked them first.",
+    "Volunteers usually meet at the north entrance, next to the greenhouse. The south gate is for deliveries only, and the east gate is locked at weekends. If you arrive late, please go to the tool shed and ask for the duty supervisor. There is a noticeboard beside the shed with the week's tasks.",
+    "We have three main volunteer roles: gardening, welcoming visitors, and helping with events. Gardeners work in small teams and are guided by a team leader. Welcome volunteers answer questions at the entrance and show visitors around. Event volunteers help set up stalls, run children's activities and tidy up afterwards. You can try more than one role during your first month.",
+    "The next community open day will be on 12 June. On that day the garden will stay open until eight in the evening, and there will be music, food and free plants for local residents. We need about twenty volunteers, so please let us know if you can help. Training for the open day will take place on the first Saturday of June.",
+    "If you would like to sign up, please email the volunteer office at volunteers@riversidegarden.org or call 555 0182. The office is open from nine until four on weekdays. You can also speak to me after this session. Thank you for listening, and I look forward to seeing you in the garden."
+  ],
+  "questions": [
+    {
+      "id": "q1",
+      "number": 1,
+      "type": "multiple-choice",
+      "prompt": "What is the main purpose of the talk?",
+      "options": [
+        { "id": "A", "text": "To welcome new volunteers" },
+        { "id": "B", "text": "To advertise a garden shop" },
+        { "id": "C", "text": "To explain a planning decision" }
+      ],
+      "answer": "A",
+      "explanation": "讲话开头说明这是一次 volunteer induction，目的是介绍花园如何运作、志愿者做什么以及如何参与。",
+      "evidence": "This short induction will explain how the garden works, what volunteers do, and how you can get involved."
+    },
+    {
+      "id": "q2",
+      "number": 2,
+      "type": "multiple-choice",
+      "prompt": "When was the garden created?",
+      "options": [
+        { "id": "A", "text": "1998" },
+        { "id": "B", "text": "2005" },
+        { "id": "C", "text": "2012" }
+      ],
+      "answer": "B",
+      "explanation": "原文明确说花园创建于 2005 年。",
+      "evidence": "The garden was created in 2005 on the site of an old car park."
+    },
+    {
+      "id": "q3",
+      "number": 3,
+      "type": "multiple-choice",
+      "prompt": "Which area is closed this month?",
+      "options": [
+        { "id": "A", "text": "The greenhouse" },
+        { "id": "B", "text": "The children's plot" },
+        { "id": "C", "text": "The tool shed" }
+      ],
+      "answer": "B",
+      "explanation": "本月 children's plot 因修路关闭，其他区域没有提到关闭。",
+      "evidence": "This month the children's plot is closed while we repair the paths"
+    },
+    {
+      "id": "q4",
+      "number": 4,
+      "type": "multiple-choice",
+      "prompt": "What must new volunteers do before starting?",
+      "options": [
+        { "id": "A", "text": "Attend a safety session" },
+        { "id": "B", "text": "Pay a membership fee" },
+        { "id": "C", "text": "Bring their own tools" }
+      ],
+      "answer": "A",
+      "explanation": "原文说开始前必须参加一次 safety session；工具由花园提供，也没有提到会员费。",
+      "evidence": "Before you start, you must attend a short safety session."
+    },
+    {
+      "id": "q5",
+      "number": 5,
+      "type": "note-completion",
+      "prompt": "The garden closes at ___ p.m.",
+      "answers": ["6", "six"],
+      "explanation": "花园每天从早上八点开放到下午六点。",
+      "evidence": "The garden is open every day from eight in the morning until six in the evening"
+    },
+    {
+      "id": "q6",
+      "number": 6,
+      "type": "note-completion",
+      "prompt": "The safety session lasts about ___ minutes.",
+      "answers": ["45", "forty-five", "forty five"],
+      "explanation": "原文说 safety session 大约持续四十五分钟。",
+      "evidence": "These sessions are held every Saturday morning at ten o'clock and last about forty-five minutes."
+    },
+    {
+      "id": "q7",
+      "number": 7,
+      "type": "note-completion",
+      "prompt": "On the first day, volunteers should bring a pair of ___.",
+      "answers": ["gloves", "glove"],
+      "explanation": "原文提醒第一天带一副手套和一瓶水。",
+      "evidence": "On your first day, please bring a pair of gloves and a water bottle."
+    },
+    {
+      "id": "q8",
+      "number": 8,
+      "type": "note-completion",
+      "prompt": "Volunteers usually meet at the ___ entrance.",
+      "answers": ["north"],
+      "explanation": "志愿者通常在 north entrance 集合，旁边是温室。",
+      "evidence": "Volunteers usually meet at the north entrance, next to the greenhouse."
+    },
+    {
+      "id": "q9",
+      "number": 9,
+      "type": "note-completion",
+      "prompt": "The next community open day is on ___ .",
+      "answers": ["12 June", "June 12", "12th June", "June 12th"],
+      "explanation": "下一次社区开放日是 6 月 12 日。",
+      "evidence": "The next community open day will be on 12 June."
+    },
+    {
+      "id": "q10",
+      "number": 10,
+      "type": "note-completion",
+      "prompt": "Volunteers can sign up by emailing the ___ .",
+      "answers": ["volunteer office", "the volunteer office"],
+      "explanation": "报名可以给 volunteer office 发邮件，或在工作日打电话。",
+      "evidence": "please email the volunteer office at volunteers@riversidegarden.org"
+    }
+  ]
+}
