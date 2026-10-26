@@ -15,6 +15,12 @@ export type VocabularyReview = {
   due: string;
   lastReviewed: string | null;
 };
+export type VocabularySignal = {
+  id: string;
+  word: string;
+  count: number;
+  lastSeen: string;
+};
 export type SavedData = {
   profile: Profile;
   logs: StudyLog[];
@@ -22,6 +28,7 @@ export type SavedData = {
   checkIns: string[];
   feedbackHistory?: FeedbackHistoryEntry[];
   vocabularyReviews?: VocabularyReview[];
+  vocabularySignals?: VocabularySignal[];
 };
 
 const skills = new Set(["listening", "reading", "writing", "speaking"]);
@@ -36,6 +43,7 @@ export function defaultData(): SavedData {
     checkIns: [],
     feedbackHistory: [],
     vocabularyReviews: [],
+    vocabularySignals: [],
   };
 }
 
@@ -76,6 +84,15 @@ function isVocabularyReview(value: unknown): value is VocabularyReview {
     && (review.lastReviewed === null || isDateKey(review.lastReviewed));
 }
 
+function isVocabularySignal(value: unknown): value is VocabularySignal {
+  if (!value || typeof value !== "object") return false;
+  const signal = value as Record<string, unknown>;
+  return typeof signal.id === "string" && signal.id.length > 0
+    && typeof signal.word === "string" && signal.word.length > 0
+    && isNonNegativeNumber(signal.count) && Number.isInteger(signal.count) && signal.count >= 1
+    && isDateKey(signal.lastSeen);
+}
+
 export function isValidState(value: unknown): value is SavedData {
   if (!value || typeof value !== "object") return false;
   const state = value as Record<string, unknown>;
@@ -100,5 +117,7 @@ export function isValidState(value: unknown): value is SavedData {
     && (!Array.isArray(state.feedbackHistory) || state.feedbackHistory.some((entry) => !isFeedbackHistoryEntry(entry)))) return false;
   if (state.vocabularyReviews !== undefined
     && (!Array.isArray(state.vocabularyReviews) || state.vocabularyReviews.some((entry) => !isVocabularyReview(entry)))) return false;
+  if (state.vocabularySignals !== undefined
+    && (!Array.isArray(state.vocabularySignals) || state.vocabularySignals.some((entry) => !isVocabularySignal(entry)))) return false;
   return state.checkIns.every(isDateKey);
 }

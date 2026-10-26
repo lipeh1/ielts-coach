@@ -425,6 +425,53 @@ export default function Home() {
     }
   }
 
+  async function addVocabularySpellingSignals(text: string) {
+    if (!hydrated || !text.trim()) return;
+    try {
+      const response = await fetch("/api/vocabulary/spellcheck", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text, limit: 5 }),
+      });
+      if (!response.ok) return;
+      const payload = await response.json() as { words?: VocabularyWord[] };
+      const matches = payload.words ?? [];
+      if (matches.length === 0) return;
+      const today = localDateKey();
+      setData((current) => {
+        const nextSignals = (current.vocabularySignals ?? []).map((signal) => ({ ...signal }));
+        const reviews = current.vocabularyReviews ?? [];
+        const additions: ReturnType<typeof createVocabularyReview>[] = [];
+
+        for (const word of matches) {
+          const index = nextSignals.findIndex((signal) => signal.id === word.id);
+          if (index >= 0) {
+            nextSignals[index] = {
+              ...nextSignals[index],
+              count: nextSignals[index].count + 1,
+              lastSeen: today,
+            };
+          } else {
+            nextSignals.push({ id: word.id, word: word.w, count: 1, lastSeen: today });
+          }
+
+          const signal = nextSignals.find((entry) => entry.id === word.id);
+          if (signal && signal.count >= 2
+            && !reviews.some((review) => review.id === word.id)
+            && !additions.some((review) => review.id === word.id)) {
+            additions.push(createVocabularyReview(word.id, word.w, "writing", today));
+          }
+        }
+
+        const next: SavedData = { ...current, vocabularySignals: nextSignals };
+        if (additions.length > 0) next.vocabularyReviews = [...additions, ...reviews];
+        return next;
+      });
+    } catch {
+      return;
+    }
+  }
+
   async function submitEssay(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!hydrated) return;
@@ -445,6 +492,7 @@ export default function Home() {
         const lr = result.criteria[2];
         void addVocabularyFromText(`${lr.observation}\n${lr.suggestion}`, "writing");
       }
+      void addVocabularySpellingSignals(essay);
       const weakest = result.criteria.reduce<FeedbackCriterion | null>(
         (lowest, criterion) => !lowest || criterion.band < lowest.band ? criterion : lowest,
         null,

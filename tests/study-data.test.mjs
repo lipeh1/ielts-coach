@@ -17,6 +17,7 @@ function populatedData() {
     checkIns: ["2026-10-12"],
     feedbackHistory: [{ id: "writing-1", date: "2026-10-12", overall: 6.5, bands: { TR: 6, CC: 7, LR: 6, GRA: 7 } }],
     vocabularyReviews: [{ id: "motivate", word: "motivate", source: "manual", interval: 1, ease: 2.5, repetitions: 1, due: "2026-10-13", lastReviewed: "2026-10-12" }],
+    vocabularySignals: [{ id: "motivated", word: "motivated", count: 2, lastSeen: "2026-10-12" }],
   };
 }
 
@@ -31,17 +32,37 @@ test("default data returns independent objects and lists", () => {
   first.checkIns.push("2026-10-12");
   first.feedbackHistory.push({ id: "writing-1", date: "2026-10-12", overall: 6.5, bands: { TR: 6, CC: 7, LR: 6, GRA: 7 } });
   first.vocabularyReviews.push({ id: "motivate", word: "motivate", source: "manual", interval: 0, ease: 2.5, repetitions: 0, due: "2026-10-12", lastReviewed: null });
+  first.vocabularySignals.push({ id: "motivated", word: "motivated", count: 1, lastSeen: "2026-10-12" });
   assert.equal(defaultData().profile.targetBand, "7.0");
   assert.deepEqual(defaultData().checkIns, []);
   assert.deepEqual(defaultData().feedbackHistory, []);
   assert.deepEqual(defaultData().vocabularyReviews, []);
+  assert.deepEqual(defaultData().vocabularySignals, []);
 });
 
-test("accepts legacy state without feedback history or vocabulary reviews", () => {
+test("accepts legacy state without feedback history, vocabulary reviews or signals", () => {
   const legacy = populatedData();
   delete legacy.feedbackHistory;
   delete legacy.vocabularyReviews;
+  delete legacy.vocabularySignals;
   assert.equal(isValidState(legacy), true);
+});
+
+test("rejects malformed vocabulary signal entries", () => {
+  for (const vocabularySignals of [
+    {},
+    [null],
+    [{ id: 1, word: "motivated", count: 1, lastSeen: "2026-10-12" }],
+    [{ id: "motivated", word: "", count: 1, lastSeen: "2026-10-12" }],
+    [{ id: "motivated", word: "motivated", count: 0, lastSeen: "2026-10-12" }],
+    [{ id: "motivated", word: "motivated", count: 1.5, lastSeen: "2026-10-12" }],
+    [{ id: "motivated", word: "motivated", count: "1", lastSeen: "2026-10-12" }],
+    [{ id: "motivated", word: "motivated", count: 1, lastSeen: "2026/10/12" }],
+  ]) {
+    const value = populatedData();
+    value.vocabularySignals = vocabularySignals;
+    assert.equal(isValidState(value), false, JSON.stringify(vocabularySignals));
+  }
 });
 
 test("rejects malformed vocabulary review entries", () => {
