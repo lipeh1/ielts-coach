@@ -85,8 +85,10 @@ test("writing feedback shows the server report and records a low-band mistake on
   await expect(page.locator(".polish-translation span")).toHaveText("中文翻译");
   await expect(page.locator(".polish-rewrite ins").first()).toBeVisible();
   await expect(page.locator(".polish-rewrite del").first()).toBeVisible();
+  await expect(page.getByText(/用时 1 分钟/)).toBeVisible();
   await expect.poll(() => writes.at(-1)?.mistakes.length).toBe(0);
   await expect.poll(() => writes.at(-1)?.feedbackHistory?.length).toBe(1);
+  expect(writes.at(-1)?.logs[0]).toMatchObject({ skill: "writing", minutes: 1 });
 
   await page.getByRole("button", { name: /错题复练/ }).first().click();
   await expect(page.getByRole("heading", { name: "暂时没有待复习错题" })).toBeVisible();

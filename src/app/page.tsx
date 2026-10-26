@@ -33,6 +33,7 @@ import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import type { FeedbackCriterion, FeedbackReport } from "@/lib/feedback";
 import { gradeListeningSection, type ListeningCompletionQuestion, type ListeningMultipleChoiceQuestion, type ListeningQuestionResult, type ListeningResult, type ListeningSection } from "@/lib/listening";
 import { listeningSection } from "@/lib/listening-data";
+import { elapsedMinutes } from "@/lib/practice-time";
 import { getDailyTask2Question } from "@/lib/questions-data";
 import { task2TypeLabels } from "@/lib/questions";
 import { gradeReadingPassage, type ReadingCompletionQuestion, type ReadingHeadingQuestion, type ReadingPassage, type ReadingQuestionResult, type ReadingResult, type ReadingTfngQuestion } from "@/lib/reading";
@@ -172,6 +173,7 @@ export default function Home() {
   const [reviewFilter, setReviewFilter] = useState<"all" | Skill>("all");
   const [essay, setEssay] = useState("");
   const [feedback, setFeedback] = useState<FeedbackReport | null>(null);
+  const [feedbackMinutes, setFeedbackMinutes] = useState<number | null>(null);
   const [feedbackError, setFeedbackError] = useState("");
   const [feedbackLoading, setFeedbackLoading] = useState(false);
   const [goalDraft, setGoalDraft] = useState<Profile>(defaultData().profile);
@@ -179,6 +181,7 @@ export default function Home() {
   const saveQueue = useRef(Promise.resolve());
   const lastQueuedData = useRef<string | null>(null);
   const saveVersion = useRef(0);
+  const writingStartedAtRef = useRef<number | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -261,8 +264,10 @@ export default function Home() {
     setAnswer("");
     setSessionResult(null);
     if (skill === "writing") {
+      writingStartedAtRef.current = Date.now();
       setActiveSkill(null);
       setFeedback(null);
+      setFeedbackMinutes(null);
       setFeedbackError("");
       setView("feedback");
       return;
@@ -278,17 +283,17 @@ export default function Home() {
     setData((current) => ({ ...current, logs: [...current.logs, log], checkIns: current.checkIns.includes(today) ? current.checkIns : [...current.checkIns, today] }));
   }
 
-  function submitSession(hasRecording: boolean) {
+  function submitSession(hasRecording: boolean, minutes: number) {
     if (!hydrated || activeSkill !== "speaking" || (!answer && !hasRecording) || sessionResult) return;
     setSessionResult({ correct: true, explanation: "完成了一次口语练习。试着回听自己的回答，检查是否先给出观点，再用细节或例子展开。" });
-    recordSession("speaking", 8, 0, 0);
+    recordSession("speaking", minutes, 0, 0);
   }
 
-  function submitReading(answers: Record<string, string>): ReadingResult | null {
+  function submitReading(answers: Record<string, string>, minutes: number): ReadingResult | null {
     if (!hydrated) return null;
     const result = gradeReadingPassage(readingPassage, answers);
     const today = localDateKey();
-    const log: StudyLog = { id: crypto.randomUUID(), date: today, minutes: readingPassage.minutes, skill: "reading", correct: result.correct, total: result.total };
+    const log: StudyLog = { id: crypto.randomUUID(), date: today, minutes, skill: "reading", correct: result.correct, total: result.total };
     setData((current) => {
       let next: SavedData = {
         ...current,
@@ -316,11 +321,11 @@ export default function Home() {
     return result;
   }
 
-  function submitListening(answers: Record<string, string>): ListeningResult | null {
+  function submitListening(answers: Record<string, string>, minutes: number): ListeningResult | null {
     if (!hydrated) return null;
     const result = gradeListeningSection(listeningSection, answers);
     const today = localDateKey();
-    const log: StudyLog = { id: crypto.randomUUID(), date: today, minutes: listeningSection.practiceMinutes, skill: "listening", correct: result.correct, total: result.total };
+    const log: StudyLog = { id: crypto.randomUUID(), date: today, minutes, skill: "listening", correct: result.correct, total: result.total };
     setData((current) => {
       let next: SavedData = {
         ...current,
@@ -356,15 +361,19 @@ export default function Home() {
   async function submitEssay(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!hydrated) return;
+    const minutes = elapsedMinutes(writingStartedAtRef.current);
     setFeedbackLoading(true);
     setFeedbackError("");
     setFeedback(null);
+    setFeedbackMinutes(null);
     try {
       const response = await fetch("/api/feedback", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ essay, prompt: writingQuestion.prompt }) });
       const result = await response.json() as FeedbackReport & { error?: string };
       if (!response.ok) throw new Error(result.error || "批改暂时不可用，请稍后重试。");
       setFeedback(result);
-      recordSession("writing", 20, 0, 0);
+      setFeedbackMinutes(minutes);
+      writingStartedAtRef.current = null;
+      recordSession("writing", minutes, 0, 0);
       const weakest = result.criteria.reduce<FeedbackCriterion | null>(
         (lowest, criterion) => !lowest || criterion.band < lowest.band ? criterion : lowest,
         null,
@@ -425,7 +434,11 @@ export default function Home() {
 
   return (
     <div className="app-shell">
-      <Sidebar view={view} onNavigate={(next) => { setView(next); setActiveSkill(null); }} openSettings={openGoalSettings} pendingReviews={pendingMistakes.length} />
+      <Sidebar view={view} onNavigate={(next) => {
+        writingStartedAtRef.current = next === "feedback" ? Date.now() : null;
+        setView(next);
+        setActiveSkill(null);
+      }} openSettings={openGoalSettings} pendingReviews={pendingMistakes.length} />
       <main className="main-area">
         <header className="topbar">
           <div className="breadcrumbs"><span>我的学习</span><span className="crumb-divider">/</span><strong>{title}</strong></div>
@@ -541,7 +554,10 @@ export default function Home() {
               <form className="essay-panel" onSubmit={submitEssay}>
                 <div className="essay-prompt"><div className="prompt-label"><span>Task 2 练习题</span><span>{task2TypeLabels[writingQuestion.type]}</span></div><p>{writingQuestion.prompt}</p><div className="prompt-meta"><span>建议用时 40 分钟</span><span>至少 250 词</span></div></div>
                 <label className="essay-label" htmlFor="essay-text">你的作文</label>
-                <textarea id="essay-text" className="essay-input" value={essay} onChange={(event) => setEssay(event.target.value)} placeholder="在这里写下你的 Task 2 作文……" minLength={40} required />
+                <textarea id="essay-text" className="essay-input" value={essay} onChange={(event) => {
+                  setEssay(event.target.value);
+                  if (writingStartedAtRef.current === null) writingStartedAtRef.current = Date.now();
+                }} placeholder="在这里写下你的 Task 2 作文……" minLength={40} required />
                 <div className="essay-footer"><span>输入统计 {essay.trim() ? essay.trim().split(/\s+/).length : 0} 词</span><AppButton type="submit" variant="primary" icon={Sparkles} disabled={!hydrated || feedbackLoading || essay.trim().length < 40}>{feedbackLoading ? "正在分析…" : "提交批改"}</AppButton></div>
                 {feedbackError && <div className="feedback-error" role="alert">{feedbackError}</div>}
                 <p className="privacy-note"><CircleHelp size={14} />提交后文本会发送至服务器配置的 AI 服务进行分析。不要提交个人敏感信息。</p>
@@ -553,7 +569,7 @@ export default function Home() {
                 <div><div className="eyebrow">批改完成 {feedback.demo && "· 演示反馈"}</div><h2>你的写作反馈</h2></div>
                 <div className="report-band">
                   <strong>{feedback.overallBand.toFixed(1)}</strong><span>练习估分</span>
-                  <small className={feedback.wordCount < 250 ? "word-count-warning" : ""}>{feedback.wordCount} 词{feedback.wordCount < 250 ? " · 未达建议长度（不扣分）" : ""}</small>
+                  <small className={feedback.wordCount < 250 ? "word-count-warning" : ""}>{feedback.wordCount} 词{feedback.wordCount < 250 ? " · 未达建议长度（不扣分）" : ""}{feedbackMinutes !== null ? ` · 用时 ${feedbackMinutes} 分钟` : ""}</small>
                 </div>
               </div>
               {feedback.demo && <div className="demo-note">当前为演示反馈。配置服务端 AI 环境变量后，这里会显示基于你作文内容生成的分析。</div>}
@@ -625,11 +641,16 @@ export default function Home() {
 function ReadingSession({ passage, ready, onSubmit, onBack }: {
   passage: ReadingPassage;
   ready: boolean;
-  onSubmit: (answers: Record<string, string>) => ReadingResult | null;
+  onSubmit: (answers: Record<string, string>, minutes: number) => ReadingResult | null;
   onBack: () => void;
 }) {
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [result, setResult] = useState<ReadingResult | null>(null);
+  const startedAtRef = useRef<number | null>(null);
+  useEffect(() => {
+    startedAtRef.current = Date.now();
+  }, []);
+  const [submittedMinutes, setSubmittedMinutes] = useState<number | null>(null);
 
   const tfngQuestions = passage.questions.filter((question): question is ReadingTfngQuestion => question.type === "true-false-not-given");
   const headingQuestions = passage.questions.filter((question): question is ReadingHeadingQuestion => question.type === "matching-headings");
@@ -641,8 +662,12 @@ function ReadingSession({ passage, ready, onSubmit, onBack }: {
   }
 
   function submit() {
-    const graded = onSubmit(answers);
-    if (graded) setResult(graded);
+    const minutes = elapsedMinutes(startedAtRef.current);
+    const graded = onSubmit(answers, minutes);
+    if (graded) {
+      setResult(graded);
+      setSubmittedMinutes(minutes);
+    }
   }
 
   function feedbackFor(id: string) {
@@ -659,7 +684,7 @@ function ReadingSession({ passage, ready, onSubmit, onBack }: {
       <div><div className="eyebrow">阅读 · 完整 Passage 1</div><h1>{passage.title}</h1><p>阅读文章，完成 13 道题。提交后查看答案与解析。</p></div>
       <span className="session-timer"><Clock3 size={15} />约 {passage.minutes} 分钟</span>
     </div>
-    {result && <div className="reading-score" role="status"><strong>{result.correct} / {result.total}</strong><span>答对题数</span></div>}
+    {result && <div className="reading-score" role="status"><strong>{result.correct} / {result.total}</strong><span>答对题数{submittedMinutes !== null ? ` · 用时 ${submittedMinutes} 分钟` : ""}</span></div>}
     <div className="reading-session-layout">
       <section className="reading-passage-panel">
         <div className="passage-label"><BookOpen size={15} />Reading Passage 1</div>
@@ -751,7 +776,7 @@ function ReadingFeedback({ graded, question, headingText }: {
 function ListeningSession({ section, ready, onSubmit, onBack }: {
   section: ListeningSection;
   ready: boolean;
-  onSubmit: (answers: Record<string, string>) => ListeningResult | null;
+  onSubmit: (answers: Record<string, string>, minutes: number) => ListeningResult | null;
   onBack: () => void;
 }) {
   const [mode, setMode] = useState<"practice" | "exam">("practice");
@@ -760,6 +785,11 @@ function ListeningSession({ section, ready, onSubmit, onBack }: {
   const [audioError, setAudioError] = useState("");
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [result, setResult] = useState<ListeningResult | null>(null);
+  const startedAtRef = useRef<number | null>(null);
+  useEffect(() => {
+    startedAtRef.current = Date.now();
+  }, []);
+  const [submittedMinutes, setSubmittedMinutes] = useState<number | null>(null);
 
   const mcQuestions = section.questions.filter((question): question is ListeningMultipleChoiceQuestion => question.type === "multiple-choice");
   const completionQuestions = section.questions.filter((question): question is ListeningCompletionQuestion => question.type === "note-completion");
@@ -795,8 +825,12 @@ function ListeningSession({ section, ready, onSubmit, onBack }: {
   }
 
   function submit() {
-    const graded = onSubmit(answers);
-    if (graded) setResult(graded);
+    const minutes = elapsedMinutes(startedAtRef.current);
+    const graded = onSubmit(answers, minutes);
+    if (graded) {
+      setResult(graded);
+      setSubmittedMinutes(minutes);
+    }
   }
 
   function feedbackFor(id: string) {
@@ -824,7 +858,7 @@ function ListeningSession({ section, ready, onSubmit, onBack }: {
       {audioError && <p className="audio-error" role="alert">{audioError}</p>}
       {result && <details className="listening-transcript"><summary>查看听力原文</summary>{section.script.map((paragraph, index) => <p key={index}>{paragraph}</p>)}</details>}
     </section>
-    {result && <div className="reading-score" role="status"><strong>{result.correct} / {result.total}</strong><span>答对题数</span></div>}
+    {result && <div className="reading-score" role="status"><strong>{result.correct} / {result.total}</strong><span>答对题数{submittedMinutes !== null ? ` · 用时 ${submittedMinutes} 分钟` : ""}</span></div>}
     <section className="reading-questions-panel listening-questions-panel">
       <ListeningQuestionGroup title="Questions 1–4" typeLabel="MULTIPLE CHOICE">
         {mcQuestions.map((question) => {
@@ -886,10 +920,15 @@ function SpeakingSession({ answer, setAnswer, result, onSubmit, onBack }: {
   answer: string;
   setAnswer: (value: string) => void;
   result: { correct: boolean; explanation: string } | null;
-  onSubmit: (hasRecording: boolean) => void;
+  onSubmit: (hasRecording: boolean, minutes: number) => void;
   onBack: () => void;
 }) {
   const [recordingState, setRecordingState] = useState<"idle" | "recording" | "recorded">("idle");
+  const [submittedMinutes, setSubmittedMinutes] = useState<number | null>(null);
+  const startedAtRef = useRef<number | null>(null);
+  useEffect(() => {
+    startedAtRef.current = Date.now();
+  }, []);
   const [elapsed, setElapsed] = useState(0);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [recordingError, setRecordingError] = useState("");
@@ -991,8 +1030,12 @@ function SpeakingSession({ answer, setAnswer, result, onSubmit, onBack }: {
         </div>
         <label className="answer-label" htmlFor="speaking-answer">练习后记录你的回答要点</label>
         <textarea id="speaking-answer" className="speaking-answer" value={answer} onChange={(event) => setAnswer(event.target.value)} placeholder="可以用英文记录你的回答，也可以先口头练习，再写下关键词……" disabled={!!result} />
-        {result && <div className="answer-feedback correct" role="status"><div className="answer-feedback-title"><Check size={17} />练习完成</div><p>{result.explanation}</p></div>}
-        <div className="session-actions">{result ? <AppButton variant="primary" icon={ArrowRight} onClick={onBack}>完成练习</AppButton> : <AppButton variant="primary" icon={Check} onClick={() => onSubmit(!!audioUrl)} disabled={(!answer && !audioUrl) || recordingState === "recording"}>完成口语练习</AppButton>}<span>练习结果会计入今日目标</span></div>
+        {result && <div className="answer-feedback correct" role="status"><div className="answer-feedback-title"><Check size={17} />练习完成</div><p>{result.explanation}{submittedMinutes !== null ? ` 本次用时 ${submittedMinutes} 分钟。` : ""}</p></div>}
+        <div className="session-actions">{result ? <AppButton variant="primary" icon={ArrowRight} onClick={onBack}>完成练习</AppButton> : <AppButton variant="primary" icon={Check} onClick={() => {
+          const minutes = elapsedMinutes(startedAtRef.current);
+          setSubmittedMinutes(minutes);
+          onSubmit(!!audioUrl, minutes);
+        }} disabled={(!answer && !audioUrl) || recordingState === "recording"}>完成口语练习</AppButton>}<span>练习结果会计入今日目标</span></div>
       </section>
       <aside className="session-help">
         <div className="help-heading"><Lightbulb size={17} /><strong>答题提醒</strong></div>

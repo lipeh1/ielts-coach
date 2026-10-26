@@ -59,12 +59,13 @@ test("full reading passage grades 13 questions and records the wrong answer", as
   await submit.click();
 
   await expect(page.locator(".reading-score strong")).toHaveText("12 / 13");
+  await expect(page.getByText(/答对题数 · 用时 1 分钟/)).toBeVisible();
   await expect(page.getByText("回答错误", { exact: true })).toHaveCount(1);
   await expect(page.getByText("参考答案", { exact: true })).toBeVisible();
 
   await expect.poll(() => writes.length).toBe(1);
   expect(writes[0].logs).toHaveLength(1);
-  expect(writes[0].logs[0]).toMatchObject({ skill: "reading", correct: 12, total: 13, minutes: 20 });
+  expect(writes[0].logs[0]).toMatchObject({ skill: "reading", correct: 12, total: 13, minutes: 1 });
   expect(writes[0].mistakes).toHaveLength(1);
   expect(writes[0].mistakes[0]).toMatchObject({ id: "reading-01-q1", skill: "reading", mastered: false });
 

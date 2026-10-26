@@ -64,8 +64,9 @@ test("speaking practice records audio and allows local playback", async ({ page 
 
   await page.getByRole("button", { name: "完成口语练习", exact: true }).click();
   await expect(page.getByText("练习完成", { exact: true })).toBeVisible();
+  await expect(page.getByText(/本次用时 1 分钟/)).toBeVisible();
 
   await expect.poll(() => writes.length).toBe(1);
-  expect(writes[0].logs[0]).toMatchObject({ skill: "speaking", minutes: 8, correct: 0, total: 0 });
+  expect(writes[0].logs[0]).toMatchObject({ skill: "speaking", minutes: 1, correct: 0, total: 0 });
   expect(writes[0].mistakes).toHaveLength(0);
 });

@@ -125,7 +125,7 @@ test("speaking practice records a completed session without mistakes", async ({ 
   await expect(page.getByText("练习完成", { exact: true })).toBeVisible();
 
   await expect.poll(() => writes.length).toBe(1);
-  expect(writes[0].logs[0]).toMatchObject({ skill: "speaking", minutes: 8, correct: 0, total: 0 });
+  expect(writes[0].logs[0]).toMatchObject({ skill: "speaking", minutes: 1, correct: 0, total: 0 });
   expect(writes[0].mistakes).toHaveLength(0);
 });
 
