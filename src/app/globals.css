@@ -259,6 +259,9 @@ button:disabled { cursor: not-allowed; opacity: .52; }
 .recording-actions { display: flex; gap: 8px; margin-top: 10px; }
 .recording-playback { width: 100%; height: 36px; margin-top: 10px; }
 .recording-note { margin: 8px 0 0; color: var(--text-tertiary); font-size: 10px; line-height: 1.5; }
+.recording-transcript { margin-top: 10px; padding: 10px 12px; border-radius: 6px; background: var(--surface-subtle); }
+.recording-transcript strong { color: var(--text-secondary); font-size: 10px; font-weight: 650; }
+.recording-transcript p { margin: 4px 0 0; color: var(--text); font-size: 11px; line-height: 1.6; white-space: pre-wrap; }
 .recording-error { margin: 8px 0 0; color: var(--danger); font-size: 10px; line-height: 1.5; }
 @keyframes recording-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
 @media (prefers-reduced-motion: reduce) { .recording-dot.active { animation: none; } }

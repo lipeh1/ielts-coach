@@ -38,7 +38,22 @@ test("speaking practice records audio and allows local playback", async ({ page 
         setTimeout(() => this.onstop?.(), 10);
       }
     }
+    class FakeSpeechRecognition {
+      lang = "";
+      continuous = false;
+      interimResults = false;
+      onresult: ((event: { resultIndex: number; results: ArrayLike<{ isFinal: boolean; 0: { transcript: string } }> }) => void) | null = null;
+      onerror: (() => void) | null = null;
+      onend: (() => void) | null = null;
+      start() {
+        setTimeout(() => this.onresult?.({ resultIndex: 0, results: [{ isFinal: true, 0: { transcript: "I learned to cook." } }] }), 10);
+      }
+      stop() {
+        setTimeout(() => this.onend?.(), 10);
+      }
+    }
     Object.defineProperty(window, "MediaRecorder", { configurable: true, value: FakeMediaRecorder });
+    Object.defineProperty(window, "SpeechRecognition", { configurable: true, value: FakeSpeechRecognition });
     Object.defineProperty(navigator, "mediaDevices", {
       configurable: true,
       value: { getUserMedia: async () => ({ getTracks: () => [{ stop() {} }] }) },
@@ -54,6 +69,7 @@ test("speaking practice records audio and allows local playback", async ({ page 
 
   await page.getByRole("button", { name: "开始录音", exact: true }).click();
   await expect(page.getByText("正在录音", { exact: true })).toBeVisible();
+  await expect(page.getByText("I learned to cook.", { exact: true })).toBeVisible();
   await page.waitForTimeout(300);
   await page.getByRole("button", { name: "停止录音", exact: true }).click();
   await expect(page.getByText("录音完成", { exact: true })).toBeVisible();

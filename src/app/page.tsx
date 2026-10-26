@@ -1062,6 +1062,29 @@ function ListeningFeedback({ graded, question }: {
   </div>;
 }
 
+type SpeechRecognitionResultLike = { isFinal: boolean; 0: { transcript: string } };
+type SpeechRecognitionEventLike = { resultIndex: number; results: ArrayLike<SpeechRecognitionResultLike> };
+type SpeechRecognitionLike = {
+  lang: string;
+  continuous: boolean;
+  interimResults: boolean;
+  start(): void;
+  stop(): void;
+  onresult: ((event: SpeechRecognitionEventLike) => void) | null;
+  onerror: (() => void) | null;
+  onend: (() => void) | null;
+};
+type SpeechRecognitionCtor = new () => SpeechRecognitionLike;
+
+function getSpeechRecognitionConstructor(): SpeechRecognitionCtor | null {
+  if (typeof window === "undefined") return null;
+  const scope = window as Window & {
+    SpeechRecognition?: SpeechRecognitionCtor;
+    webkitSpeechRecognition?: SpeechRecognitionCtor;
+  };
+  return scope.SpeechRecognition ?? scope.webkitSpeechRecognition ?? null;
+}
+
 function SpeakingSession({ answer, setAnswer, result, onSubmit, onBack }: {
   answer: string;
   setAnswer: (value: string) => void;
@@ -1078,6 +1101,9 @@ function SpeakingSession({ answer, setAnswer, result, onSubmit, onBack }: {
   const [elapsed, setElapsed] = useState(0);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [recordingError, setRecordingError] = useState("");
+  const [transcript, setTranscript] = useState("");
+  const [transcriptNotice, setTranscriptNotice] = useState("");
+  const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -1092,6 +1118,7 @@ function SpeakingSession({ answer, setAnswer, result, onSubmit, onBack }: {
 
   useEffect(() => () => {
     if (timerRef.current !== null) window.clearInterval(timerRef.current);
+    stopRecognition();
     const recorder = recorderRef.current;
     if (recorder && recorder.state !== "inactive") {
       recorder.onstop = null;
@@ -1100,6 +1127,53 @@ function SpeakingSession({ answer, setAnswer, result, onSubmit, onBack }: {
     streamRef.current?.getTracks().forEach((track) => track.stop());
     if (audioUrlRef.current) URL.revokeObjectURL(audioUrlRef.current);
   }, []);
+
+  function stopRecognition() {
+    const recognition = recognitionRef.current;
+    if (!recognition) return;
+    recognitionRef.current = null;
+    try {
+      recognition.stop();
+    } catch {
+      // Recognition may already have ended on its own.
+    }
+  }
+
+  function startRecognition() {
+    const Recognition = getSpeechRecognitionConstructor();
+    if (!Recognition) {
+      setTranscriptNotice("当前浏览器不支持实时转写，录音仍可回放。");
+      return;
+    }
+    setTranscript("");
+    setTranscriptNotice("");
+    const recognition = new Recognition();
+    recognition.lang = "en-GB";
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.onresult = (event) => {
+      let finalText = "";
+      for (let index = event.resultIndex; index < event.results.length; index += 1) {
+        const result = event.results[index];
+        if (result?.isFinal) finalText += `${result[0]?.transcript ?? ""} `;
+      }
+      if (finalText.trim()) setTranscript((current) => `${current} ${finalText}`.trim());
+    };
+    recognition.onerror = () => {
+      recognitionRef.current = null;
+      setTranscriptNotice("实时转写中断，录音仍可回放。");
+    };
+    recognition.onend = () => {
+      recognitionRef.current = null;
+    };
+    recognitionRef.current = recognition;
+    try {
+      recognition.start();
+    } catch {
+      recognitionRef.current = null;
+      setTranscriptNotice("实时转写启动失败，录音仍可回放。");
+    }
+  }
 
   async function startRecording() {
     if (result) return;
@@ -1120,6 +1194,7 @@ function SpeakingSession({ answer, setAnswer, result, onSubmit, onBack }: {
         if (event.data.size > 0) chunksRef.current.push(event.data);
       };
       recorder.onstop = () => {
+        stopRecognition();
         const blob = new Blob(chunksRef.current, { type: recorder.mimeType || "audio/webm" });
         setRecordingUrl(URL.createObjectURL(blob));
         setRecordingState("recorded");
@@ -1132,6 +1207,7 @@ function SpeakingSession({ answer, setAnswer, result, onSubmit, onBack }: {
       };
       recorder.start();
       setRecordingState("recording");
+      startRecognition();
       const startedAt = Date.now();
       timerRef.current = window.setInterval(() => {
         const seconds = Math.min(120, Math.floor((Date.now() - startedAt) / 1000));
@@ -1171,8 +1247,10 @@ function SpeakingSession({ answer, setAnswer, result, onSubmit, onBack }: {
               : <AppButton variant="secondary" icon={Mic2} onClick={startRecording} disabled={!!result}>{recordingState === "recorded" ? "重新录音" : "开始录音"}</AppButton>}
           </div>
           {audioUrl && <audio className="recording-playback" controls src={audioUrl} />}
+          {transcript && <div className="recording-transcript"><strong>浏览器转写</strong><p>{transcript}</p></div>}
+          {transcriptNotice && <p className="recording-note">{transcriptNotice}</p>}
           {recordingError && <p className="recording-error" role="alert">{recordingError}</p>}
-          <p className="recording-note">录音只保存在当前浏览器页面，不会上传；最长 2 分钟。</p>
+          <p className="recording-note">录音保存在当前页面；如果浏览器支持实时转写，语音可能由浏览器语音服务处理，转写不会保存。最长 2 分钟。</p>
         </div>
         <label className="answer-label" htmlFor="speaking-answer">练习后记录你的回答要点</label>
         <textarea id="speaking-answer" className="speaking-answer" value={answer} onChange={(event) => setAnswer(event.target.value)} placeholder="可以用英文记录你的回答，也可以先口头练习，再写下关键词……" disabled={!!result} />
