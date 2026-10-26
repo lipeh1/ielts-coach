@@ -48,6 +48,10 @@ curl "http://localhost:7500/api/vocabulary?cefr=B2&topic=education&pageSize=5"
 curl "http://localhost:7500/api/vocabulary?id=motivate"
 ```
 
+## 题库
+
+Task 2 题目保存在 `src/data/questions/task2.json`，每道题带 `type` 标签（观点 / 讨论 / 利弊 / 问题解决 / 双问题）。反馈页按日期轮换当天题目；新增题目只需修改 JSON，不需要改组件。
+
 ## 检查
 
 ```bash

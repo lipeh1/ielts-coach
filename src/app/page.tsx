@@ -30,12 +30,12 @@ import {
 } from "lucide-react";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import type { FeedbackCriterion, FeedbackReport } from "@/lib/feedback";
+import { getDailyTask2Question } from "@/lib/questions-data";
+import { task2TypeLabels } from "@/lib/questions";
 import { defaultData, isValidState, type FeedbackHistoryEntry, type Mistake, type Profile, type SavedData, type Skill, type StudyLog } from "@/lib/study-data";
 import { diffWords } from "@/lib/word-diff";
 
 type View = "today" | "practice" | "review" | "feedback" | "progress";
-
-const writingTaskPrompt = "Some people believe that employees should be given the right to work from home. Others think that working in an office is more effective. Discuss both views and give your own opinion.";
 
 const feedbackBandKeys = [
   { key: "TR", label: "任务回应", color: "#2f7cf6" },
@@ -225,6 +225,7 @@ export default function Home() {
   }, [data, hydrated]);
 
   const todayKey = localDateKey();
+  const writingQuestion = useMemo(() => getDailyTask2Question(todayKey), [todayKey]);
   const todayLogs = data.logs.filter((log) => log.date === todayKey);
   const todayMinutes = todayLogs.reduce((sum, log) => sum + log.minutes, 0);
   const todayDone = todayLogs.length;
@@ -298,7 +299,7 @@ export default function Home() {
     setFeedbackError("");
     setFeedback(null);
     try {
-      const response = await fetch("/api/feedback", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ essay, prompt: writingTaskPrompt }) });
+      const response = await fetch("/api/feedback", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ essay, prompt: writingQuestion.prompt }) });
       const result = await response.json() as FeedbackReport & { error?: string };
       if (!response.ok) throw new Error(result.error || "批改暂时不可用，请稍后重试。");
       setFeedback(result);
@@ -489,7 +490,7 @@ export default function Home() {
             <div className="page-title-row"><div><div className="eyebrow">Writing Task 2 · TR / CC / LR / GRA</div><h1>AI 写作批改</h1><p>提交作文后，按四项评分标准查看估分、原文证据和下一步建议。</p></div><span className="small-pill"><Sparkles size={14} />练习参考</span></div>
             <div className="writing-layout">
               <form className="essay-panel" onSubmit={submitEssay}>
-                <div className="essay-prompt"><div className="prompt-label"><span>Task 2 练习题</span><span>观点讨论</span></div><p>{writingTaskPrompt}</p><div className="prompt-meta"><span>建议用时 40 分钟</span><span>至少 250 词</span></div></div>
+                <div className="essay-prompt"><div className="prompt-label"><span>Task 2 练习题</span><span>{task2TypeLabels[writingQuestion.type]}</span></div><p>{writingQuestion.prompt}</p><div className="prompt-meta"><span>建议用时 40 分钟</span><span>至少 250 词</span></div></div>
                 <label className="essay-label" htmlFor="essay-text">你的作文</label>
                 <textarea id="essay-text" className="essay-input" value={essay} onChange={(event) => setEssay(event.target.value)} placeholder="在这里写下你的 Task 2 作文……" minLength={40} required />
                 <div className="essay-footer"><span>输入统计 {essay.trim() ? essay.trim().split(/\s+/).length : 0} 词</span><AppButton type="submit" variant="primary" icon={Sparkles} disabled={!hydrated || feedbackLoading || essay.trim().length < 40}>{feedbackLoading ? "正在分析…" : "提交批改"}</AppButton></div>

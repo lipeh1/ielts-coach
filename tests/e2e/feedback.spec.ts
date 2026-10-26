@@ -75,8 +75,10 @@ test("writing feedback shows the server report and records a low-band mistake on
   await page.goto("/");
   await expect(page.getByText("正在读取学习记录，载入后即可开始练习。")).toHaveCount(0);
 
+  await page.getByRole("button", { name: "AI 批改", exact: true }).click();
+  const displayedPrompt = await page.locator(".essay-prompt p").innerText();
   await submit(page, essay);
-  expect(feedbackBodies.at(-1)?.prompt).toContain("Discuss both views");
+  expect(feedbackBodies.at(-1)?.prompt).toBe(displayedPrompt);
   await expect(page.getByText("42 词 · 未达建议长度（不扣分）")).toBeVisible();
   await expect(page.getByText("本项未找到可核验原文")).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "润色稿" })).toBeVisible();
